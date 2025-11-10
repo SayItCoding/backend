@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -36,7 +37,7 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
         const u = new URL(databaseUrl);
         const isInternal = u.hostname.endsWith('.railway.internal');
 
-        // 진단 로그
+        /* 진단 로그
         (() => {
           const raw = process.env.DATABASE_URL || '';
           const safe = raw.replace(/:\/\/([^:]+):([^@]+)@/, '://$1:*****@');
@@ -58,15 +59,27 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
             process.env.NODE_OPTIONS,
           );
         })();
+        */
 
         return {
           type: 'postgres',
           url: databaseUrl,
+
+          // 마이그레이션 경로 등록
+          migrations: isProd
+            ? [join(__dirname, 'migrations/*.{js}')]
+            : ['src/migrations/*.{ts}'],
+
           autoLoadEntities: true,
           synchronize: isProd ? false : sync,
           migrationsRun: isProd,
           ssl: undefined,
           extra: undefined,
+
+          // 로그에서 마이그레이션 출력
+          logging: ['error', 'warn', 'migration'],
+          retryAttempts: 10,
+          retryDelay: 3000,
         };
       },
     }),
