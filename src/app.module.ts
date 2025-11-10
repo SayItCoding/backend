@@ -65,9 +65,8 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
           autoLoadEntities: true,
           synchronize: isProd ? false : sync,
           migrationsRun: isProd,
-          ssl:
-            isProd && !isInternal ? { rejectUnauthorized: false } : undefined,
-          extra: isProd && !isInternal ? { sslmode: 'require' } : undefined,
+          ssl: undefined,
+          extra: undefined,
         };
       },
     }),
