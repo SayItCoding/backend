@@ -26,12 +26,38 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const isProd = config.get('NODE_ENV') === 'production';
-        const databaseUrl = config.get<string>('DATABASE_URL');
+
         const sync = config.get('TYPEORM_SYNC') === 'true';
 
-        if (isProd && !databaseUrl) {
-          throw new Error('DATABASE_URL is required in production');
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        if (!databaseUrl) {
+          throw new Error('DATABASE_URL is not defined');
         }
+        const u = new URL(databaseUrl);
+        const isInternal = u.hostname.endsWith('.railway.internal');
+
+        // 진단 로그
+        (() => {
+          const raw = process.env.DATABASE_URL || '';
+          const safe = raw.replace(/:\/\/([^:]+):([^@]+)@/, '://$1:*****@');
+          const h = (() => {
+            try {
+              return new URL(raw).hostname;
+            } catch {
+              return '(bad URL)';
+            }
+          })();
+          console.log(
+            '[DB] url=',
+            safe,
+            'host=',
+            h,
+            'NODE_ENV=',
+            process.env.NODE_ENV,
+            'NODE_OPTIONS=',
+            process.env.NODE_OPTIONS,
+          );
+        })();
 
         return {
           type: 'postgres',
@@ -39,7 +65,9 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
           autoLoadEntities: true,
           synchronize: isProd ? false : sync,
           migrationsRun: isProd,
-          ssl: isProd ? { rejectUnauthorized: false } : undefined,
+          ssl:
+            isProd && !isInternal ? { rejectUnauthorized: false } : undefined,
+          extra: isProd && !isInternal ? { sslmode: 'require' } : undefined,
         };
       },
     }),
