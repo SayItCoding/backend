@@ -18,7 +18,7 @@ export class Mission {
   category?: string;
 
   // Entry 프로젝트 데이터 (JSON)
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'jsonb', name: 'projectdata' })
   projectData: {
     speed: number; // 작품 실행 속도 (FPS)
     objects: any[]; // 오브젝트 정보
