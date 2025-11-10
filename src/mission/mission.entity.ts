@@ -35,12 +35,17 @@ export class Mission {
   };
 
   // 생성 시각
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    type: 'timestamp',
+    name: 'createdat',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
   // 수정 시각
   @Column({
     type: 'timestamp',
+    name: 'updatedat',
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })
