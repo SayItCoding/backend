@@ -18,6 +18,9 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
     ConfigModule.forRoot({
       isGlobal: true, // 모든 모듈에서 process.env 사용 가능
       envFilePath: [`.env.${process.env.NODE_ENV}`, '.env'],
+      ignoreEnvFile: process.env.NODE_ENV === 'production',
+      cache: true,
+      expandVariables: true,
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -25,6 +28,10 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
         const isProd = config.get('NODE_ENV') === 'production';
         const databaseUrl = config.get<string>('DATABASE_URL');
         const sync = config.get('TYPEORM_SYNC') === 'true';
+
+        if (isProd && !databaseUrl) {
+          throw new Error('DATABASE_URL is required in production');
+        }
 
         return {
           type: 'postgres',

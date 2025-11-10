@@ -11,7 +11,10 @@ async function bootstrap() {
     credentials: true, // 쿠키, 세션 등 인증정보 포함 허용
   });
 
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000);
-  console.log(`Server running on port ${process.env.PORT || 3000}`);
+  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`Server running on port ${process.env.PORT}`);
 }
 bootstrap();
