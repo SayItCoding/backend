@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { MissionModule } from './mission/mission.module';
 import { AppController } from './app.controller';
 import { IntentModule } from './ai/intentclassifier/intent.module';
+import { UserModule } from './user/user.moduls';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
     AssignmentModule,
     DashboardModule,
     AuthModule,
+    UserModule,
     IntentModule,
     ConfigModule.forRoot({
       isGlobal: true, // 모든 모듈에서 process.env 사용 가능
@@ -74,7 +76,13 @@ import { IntentModule } from './ai/intentclassifier/intent.module';
           synchronize: isProd ? false : sync,
           migrationsRun: isProd,
           ssl: undefined,
-          extra: undefined,
+
+          // 끊긴 연결 자동 복구
+          extra: {
+            connectionTimeoutMillis: 5000,
+            idleTimeoutMillis: 30000,
+            keepAlive: true,
+          },
 
           // 로그에서 마이그레이션 출력
           logging: ['error', 'warn', 'migration'],

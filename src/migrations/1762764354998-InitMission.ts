@@ -14,18 +14,18 @@ export class InitMission1710240000000 implements MigrationInterface {
             isGenerated: true,
             generationStrategy: 'increment', // SERIAL/identity에 대응
           },
-          { name: 'name', type: 'varchar', isNullable: false }, // 미션 제목
-          { name: 'description', type: 'text', isNullable: true }, // 미션 설명
-          { name: 'category', type: 'varchar', isNullable: true }, // 미션 카테고리
-          { name: 'projectData', type: 'jsonb', isNullable: false }, // Entry 프로젝트 JSON
+          { name: 'name', type: 'varchar' }, // 미션 제목
+          { name: 'description', type: 'text' }, // 미션 설명
+          { name: 'category', type: 'varchar' }, // 미션 카테고리
+          { name: 'projectdata', type: 'jsonb' }, // Entry 프로젝트 JSON
           {
-            name: 'createdAt',
+            name: 'createdat',
             type: 'timestamptz',
             default: 'now()',
             isNullable: false,
           },
           {
-            name: 'updatedAt',
+            name: 'updatedat',
             type: 'timestamptz',
             default: 'now()',
             isNullable: false,
