@@ -13,5 +13,6 @@ export default new DataSource({
   ssl: isProd ? { rejectUnauthorized: false } : undefined, // 공용 URL일 때 필요
   entities,
   migrations,
+  synchronize: false,
   // 필요 시 logging 조정: ['error','warn','migration']
 });
