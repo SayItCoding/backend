@@ -7,10 +7,14 @@ import {
   Query,
   DefaultValuePipe,
   ParseIntPipe,
+  HttpCode,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { MissionService } from './mission.service';
 import { Pagination } from 'nestjs-typeorm-paginate';
 import { Mission } from './mission.entity';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/api/v1/missions')
 export class MissionController {
@@ -21,8 +25,7 @@ export class MissionController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
   ): Promise<Pagination<Mission>> {
-    // limit 상한
-    limit = Math.min(limit, 100);
+    limit = Math.min(limit, 100); // limit 상한
 
     return this.missionService.paginate({
       page,
@@ -34,5 +37,37 @@ export class MissionController {
   @Get(':id')
   findOne(@Param('id') id: number) {
     return this.missionService.findOne(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':missionId/chats')
+  @HttpCode(200)
+  async getUserMissionChats(
+    @Param('missionId', ParseIntPipe) missionId: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Req() req: any,
+  ) {
+    return this.missionService.getUserMissionChats({
+      userId: req.user.userId,
+      missionId,
+      page,
+      limit,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':missionId/chats')
+  @HttpCode(201)
+  createChatAndReply(
+    @Param('missionId', ParseIntPipe) missionId: number,
+    @Body('content') message: string,
+    @Req() req: any,
+  ) {
+    return this.missionService.createChatAndReply({
+      userId: req.user.userId,
+      missionId,
+      message,
+    });
   }
 }

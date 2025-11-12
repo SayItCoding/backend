@@ -1,20 +1,25 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { UserMission } from './user-mission.entity';
 
 @Entity('missions')
 export class Mission {
   @PrimaryGeneratedColumn()
   id: number;
 
-  // 미션 제목
   @Column()
-  name: string;
+  title: string;
 
-  // 미션 설명
-  @Column({ type: 'text', nullable: true })
+  @Column()
   description?: string;
 
-  // 미션 카테고리
-  @Column({ type: 'varchar', nullable: true })
+  @Column()
   category?: string;
 
   // Entry 프로젝트 데이터 (JSON)
@@ -28,26 +33,14 @@ export class Mission {
     scenes: any[]; // 장면 정보
     interface: any[]; // 인터페이스 정보
     tables: any[]; // 데이터 테이블 목록
-    learning: string | null; // 학습 모델 ID
-    aiUtilizeBlocks: string[]; // AI 블록 목록
-    expansionBlocks: string[]; // 확장 블록 목록
-    hardwareLiteBlocks: string[]; // 브라우저 하드웨어 블록 목록
   };
 
-  // 생성 시각
-  @Column({
-    type: 'timestamp',
-    name: 'createdat',
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @CreateDateColumn()
   createdAt: Date;
 
-  // 수정 시각
-  @Column({
-    type: 'timestamp',
-    name: 'updatedat',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => UserMission, (userMission) => userMission.mission)
+  userMissions: UserMission[];
 }

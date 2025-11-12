@@ -6,8 +6,10 @@ import {
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { UserMission } from '../mission/user-mission.entity';
 
 @Entity('users')
 @Unique(['email'])
@@ -32,6 +34,9 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => UserMission, (userMission) => userMission.mission)
+  userMissions: UserMission[];
 
   @BeforeInsert()
   async hashPassword() {
