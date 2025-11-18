@@ -16,6 +16,7 @@ export class IntentController {
     @Body()
     body: {
       utterance: string;
+      projectData?: any;
       map?: string;
       char_location?: string;
       direction?: string;
@@ -23,6 +24,7 @@ export class IntentController {
   ) {
     const result = await this.intentService.classify(
       body.utterance,
+      body.projectData,
       body.map ?? 'unknown',
       body.char_location ?? '0,0',
       body.direction ?? 'north',

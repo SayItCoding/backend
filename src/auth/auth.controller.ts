@@ -38,22 +38,4 @@ export class AuthController {
   logout(@Req() req: any) {
     return this.authService.logout(req.user.userId); // JwtStrategy.validate에서 셋팅
   }
-
-  @Post('logout-debug')
-  logoutDebug(@Req() req: any) {
-    const auth = req.headers['authorization'];
-    if (!auth?.startsWith('Bearer ')) return { error: 'No Bearer token' };
-    const token = auth.slice(7);
-
-    try {
-      const decoded = jsonwebtoken.verify(token, process.env.JWT_SECRET!, {
-        issuer: process.env.JWT_ISS,
-        audience: process.env.JWT_AUD,
-        // clockTolerance: 5, // 필요시
-      });
-      return { ok: true, decoded };
-    } catch (e: any) {
-      return { ok: false, name: e.name, message: e.message }; // e.name: JsonWebTokenError | TokenExpiredError | NotBeforeError
-    }
-  }
 }

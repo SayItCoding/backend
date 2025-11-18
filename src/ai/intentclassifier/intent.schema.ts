@@ -20,22 +20,12 @@ export const IntentOutput = z.object({
   reasoning: z.string(),
   alternatives: z.array(IntentItem).optional().default([]),
   slots: z.object({
-    action: z.enum(['move', 'turn', 'repeat']).nullable(),
+    action: z.enum(['move', 'turn']).nullable(),
     count: z.number().int().positive().nullable(),
-    direction: z
-      .enum([
-        'left',
-        'right',
-        'forward',
-        'backward',
-        'north',
-        'south',
-        'east',
-        'west',
-      ])
-      .nullable(),
+    direction: z.enum(['left', 'right', 'forward', 'backward']).nullable(),
     language: z.string().nullable(),
     target: z.string().nullable(),
+    loop_explicit: z.boolean().default(false),
   }),
   needs_clarification: z.boolean(),
 });

@@ -2,6 +2,19 @@
 import { Injectable } from '@nestjs/common';
 import { OpenAIClient } from '../../openai/openai.client';
 import { INTENT_JSON_SCHEMA, IntentOutput } from './intent.schema';
+import { z } from 'zod';
+import { Slot } from 'src/utils/entry/blockTypes';
+import {
+  createTriggerBlock,
+  buildBlocksFromSlots,
+} from 'src/utils/entry/blockBuilder';
+import {
+  normalizeScripts,
+  applyScripts,
+} from '../../utils/entry/scriptBuilder';
+
+// Zod 스키마에서 타입 뽑아오기
+export type IntentOutputT = z.infer<typeof IntentOutput>;
 
 @Injectable()
 export class IntentService {
@@ -9,6 +22,7 @@ export class IntentService {
 
   async classify(
     utterance: string,
+    projectData: any,
     map: string,
     char_location: string,
     direction: string,
@@ -44,9 +58,13 @@ JSON 외의 텍스트, 설명, 마크업을 절대 포함하지 마세요.
 슬롯 추출(가능할 때만):
 - action: move | turn | repeat
 - count: 정수 | null
-- direction: left | right | forward | backward | north | south | east | west | null
-- language: "python" 등 (명시된 경우)
+- direction: left | right | forward | backward | null
 - target: 수정 대상 식별자(함수/블록명) 또는 null
+- loop_explicit:
+  - true: 사용자가 "반복", "~번 반복", "for문", "while문" 등 **반복 구조 자체를 명시적으로 요청**한 경우
+    - 예: "앞으로 2칸 반복해", "이 동작 세 번 반복해", "for문으로 세 번 돌려"
+  - false: 단순히 "앞으로 2칸 가", "왼쪽으로 세 번 돌아"처럼
+    **횟수는 말했지만 반복문/루프라는 표현은 하지 않은 경우**
 
 ## 출력 형식(JSON만)
 {
@@ -98,6 +116,84 @@ JSON 외의 텍스트, 설명, 마크업을 절대 포함하지 마세요.
     });
 
     const jsonText = response.output_text!;
-    return IntentOutput.parse(JSON.parse(jsonText));
+    const intentOutput = IntentOutput.parse(JSON.parse(jsonText));
+
+    const input = {
+      projectData,
+    };
+
+    switch (intentOutput.primary) {
+      case 'MAKE_CODE':
+        return this.handleMakeCode(input, intentOutput);
+      case 'EDIT_CODE':
+        return this.handleEditCode(intentOutput);
+      case 'QUESTION':
+        return this.handleQuestion(intentOutput);
+      case 'EXPLANATION':
+        return this.handleExplanation(intentOutput);
+      case 'OTHER':
+        return this.handleOther(intentOutput);
+      case 'UNKNOWN':
+      default:
+        return this.handleUnknown(intentOutput);
+    }
+  }
+
+  private async handleMakeCode(
+    input: { projectData?: any },
+    intent: IntentOutputT,
+  ) {
+    console.log('handle Make Code');
+    // TODO : 엔트리 블록 생성 코드 작성
+    const slots = intent.slots;
+
+    //console.log(slots);
+
+    // 1) script 파싱 (objects[0].script 기준)
+    const { scripts, sourceType } = normalizeScripts(input.projectData);
+
+    // 2) slots → 엔트리 블록 생성
+    const newBlocks = buildBlocksFromSlots(slots);
+
+    //console.log(newBlocks);
+
+    // 3) scripts[0] 없으면 트리거 블록 생성
+    if (!scripts[0]) {
+      scripts[0] = [createTriggerBlock()];
+    }
+
+    // 4) 맨 뒤에 붙이기
+    scripts[0].push(...newBlocks);
+
+    // 5) script를 다시 objects[0].script에 적용
+    const updatedProjectData = applyScripts(
+      input.projectData,
+      scripts,
+      sourceType,
+    );
+
+    return {
+      projectData: updatedProjectData,
+    };
+  }
+
+  private async handleEditCode(intent: IntentOutputT) {
+    console.log('handle Edit Code');
+  }
+
+  private async handleQuestion(intent: IntentOutputT) {
+    console.log('handle Question');
+  }
+
+  private async handleExplanation(intent: IntentOutputT) {
+    console.log('handle Explanation');
+  }
+
+  private async handleOther(intent: IntentOutputT) {
+    console.log('handle Other');
+  }
+
+  private async handleUnknown(intent: IntentOutputT) {
+    console.log('handle Unknown');
   }
 }
