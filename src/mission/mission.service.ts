@@ -6,9 +6,10 @@ import {
   Pagination,
   IPaginationOptions,
 } from 'nestjs-typeorm-paginate';
-import { Mission } from './mission.entity';
-import { UserMission } from './user-mission.entity';
-import { MissionChat } from './mission-chat.entity';
+import { Mission } from './entity/mission.entity';
+import { UserMission } from './entity/user-mission.entity';
+import { MissionChat } from './entity/mission-chat.entity';
+import { IntentService } from 'src/ai/intentclassifier/intent.service';
 
 @Injectable()
 export class MissionService {
@@ -19,10 +20,20 @@ export class MissionService {
     private readonly userMissionRepo: Repository<UserMission>,
     @InjectRepository(MissionChat)
     private readonly missionChatRepo: Repository<MissionChat>,
+    private readonly intentService: IntentService,
   ) {}
 
-  paginate(options: IPaginationOptions): Promise<Pagination<Mission>> {
-    return paginate(this.missionRepo, options);
+  async paginate(
+    options: IPaginationOptions,
+    filter?: { category?: string },
+  ): Promise<Pagination<Mission>> {
+    const where: any = {};
+
+    if (filter?.category) {
+      where.category = filter.category;
+    }
+
+    return paginate<Mission>(this.missionRepo, options, { where });
   }
 
   async paginateQB(options: IPaginationOptions): Promise<Pagination<Mission>> {

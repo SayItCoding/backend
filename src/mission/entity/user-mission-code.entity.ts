@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('user_mission_codes')
@@ -24,14 +25,12 @@ export class UserMissionCode {
   @Column()
   chatId: number; // MissionChat.id
 
-  // 전체 프로젝트 JSON (Entry project.json 통째로 저장)
-  @Column({ type: 'jsonb' }) // postgres면 jsonb 추천, 아니면 'text'
+  @Column({ type: 'jsonb' })
   projectData: any;
-
-  // scripts 부분만 따로 쓰고 싶으면 (선택)
-  @Column({ type: 'jsonb', nullable: true })
-  scripts: any;
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

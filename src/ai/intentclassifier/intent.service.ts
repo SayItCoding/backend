@@ -144,7 +144,6 @@ JSON 외의 텍스트, 설명, 마크업을 절대 포함하지 마세요.
     intent: IntentOutputT,
   ) {
     console.log('handle Make Code');
-    // TODO : 엔트리 블록 생성 코드 작성
     const slots = intent.slots;
 
     //console.log(slots);

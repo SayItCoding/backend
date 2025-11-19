@@ -9,7 +9,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { UserMission } from '../mission/user-mission.entity';
+import { UserMission } from '../../mission/entity/user-mission.entity';
 
 @Entity('users')
 @Unique(['email'])

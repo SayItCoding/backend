@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { MissionService } from './mission.service';
 import { Pagination } from 'nestjs-typeorm-paginate';
-import { Mission } from './mission.entity';
+import { Mission } from './entity/mission.entity';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/api/v1/missions')
@@ -24,14 +24,18 @@ export class MissionController {
   async findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+    @Query('category') category?: string,
   ): Promise<Pagination<Mission>> {
     limit = Math.min(limit, 100); // limit 상한
 
-    return this.missionService.paginate({
-      page,
-      limit,
-      route: '/api/v1/missions',
-    });
+    return this.missionService.paginate(
+      {
+        page,
+        limit,
+        route: '/api/v1/missions',
+      },
+      { category },
+    );
   }
 
   @Get(':id')

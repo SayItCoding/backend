@@ -32,7 +32,6 @@ export class Mission {
     functions: any[]; // 함수 정보
     scenes: any[]; // 장면 정보
     interface: any[]; // 인터페이스 정보
-    tables: any[]; // 데이터 테이블 목록
   };
 
   @CreateDateColumn()
