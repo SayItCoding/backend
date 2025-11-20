@@ -19,6 +19,9 @@ export class MissionChat {
   @Column()
   missionId: number;
 
+  @Column({ nullable: true })
+  codeSnapshotId: number; // user_mission_codes.id
+
   @Column()
   content: string; // 메시지
 

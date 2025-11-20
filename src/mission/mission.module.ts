@@ -5,12 +5,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Mission } from './entity/mission.entity';
 import { UserMission } from './entity/user-mission.entity';
 import { MissionChat } from './entity/mission-chat.entity';
+import { UserMissionCode } from './entity/user-mission-code.entity';
 
 import { IntentModule } from 'src/ai/intentclassifier/intent.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Mission, UserMission, MissionChat]),
+    TypeOrmModule.forFeature([
+      Mission,
+      UserMission,
+      MissionChat,
+      UserMissionCode,
+    ]),
     IntentModule,
   ],
   controllers: [MissionController],

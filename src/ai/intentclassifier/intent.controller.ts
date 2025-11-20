@@ -1,6 +1,7 @@
 // src/ai/intentclassifier/intent.controller.ts
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
 import { IntentService } from './intent.service';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('intent')
 export class IntentController {
@@ -11,24 +12,18 @@ export class IntentController {
     return 'intent classifier';
   }
 
-  @Post('classify')
-  async classify(
-    @Body()
-    body: {
-      utterance: string;
-      projectData?: any;
-      map?: string;
-      char_location?: string;
-      direction?: string;
-    },
-  ) {
-    const result = await this.intentService.classify(
-      body.utterance,
-      body.projectData,
-      body.map ?? 'unknown',
-      body.char_location ?? '0,0',
-      body.direction ?? 'north',
+  @UseGuards(JwtAuthGuard)
+  @Post('/process')
+  async process(@Body() body, @Req() req) {
+    const { utterance, projectData, map, char_location, direction } = body;
+    const userId = req.user.userId ?? req.user.id;
+    return this.intentService.process(
+      userId,
+      utterance,
+      projectData,
+      map,
+      char_location,
+      direction,
     );
-    return result;
   }
 }
