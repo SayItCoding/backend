@@ -35,7 +35,7 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => UserMission, (userMission) => userMission.mission)
+  @OneToMany(() => UserMission, (userMission) => userMission.user)
   userMissions: UserMission[];
 
   @BeforeInsert()
