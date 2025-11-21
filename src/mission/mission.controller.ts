@@ -38,9 +38,14 @@ export class MissionController {
     );
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.missionService.findOne(id);
+  @UseGuards(JwtAuthGuard)
+  @Get(':missionId')
+  findOne(
+    @Param('missionId', ParseIntPipe) missionId: number,
+    @Req() req: any,
+  ) {
+    const userId = req.user.userId;
+    return this.missionService.findOne(userId, missionId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -131,8 +131,47 @@ export class MissionService {
   }
 
   // id로 미션 조회
-  findOne(id: number) {
-    return this.missionRepo.findOneBy({ id });
+  async findOne(userId: number, missionId: number) {
+    // 기본 mission 데이터
+    const mission = await this.missionRepo.findOne({
+      where: { id: missionId },
+    });
+
+    if (!mission) {
+      throw new NotFoundException('Mission not found');
+    }
+
+    // userId가 안 넘어오면 기본값 그대로 반환
+    if (!userId) {
+      return mission;
+    }
+
+    // userMission이 있는지 확인
+    const userMission = await this.userMissionRepo.findOne({
+      where: { userId, missionId },
+    });
+
+    // userMission 자체가 없으면 기본 mission 반환
+    if (!userMission) {
+      return mission;
+    }
+
+    // latestMissionCodeId가 있으면 해당 코드 사용
+    if (userMission.latestMissionCodeId) {
+      const snapshot = await this.missionCodeRepo.findOne({
+        where: { id: userMission.latestMissionCodeId },
+      });
+
+      if (snapshot && snapshot.projectData) {
+        return {
+          ...mission,
+          projectData: snapshot.projectData,
+        };
+      }
+    }
+
+    // 없으면 원래 mission 데이터 반환
+    return mission;
   }
 
   // 사용자 미션별 대화 내역 조회
