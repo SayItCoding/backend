@@ -74,4 +74,19 @@ export class MissionController {
       message,
     });
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('/:missionId/mission-codes/:missionCodeId')
+  async getMissionCode(
+    @Param('missionId', ParseIntPipe) missionId: number,
+    @Param('missionCodeId', ParseIntPipe) missionCodeId: number,
+    @Req() req,
+  ) {
+    const userId = req.user.userId ?? req.user.id;
+    return this.missionService.getMissionCodeById({
+      userId,
+      missionId,
+      missionCodeId,
+    });
+  }
 }

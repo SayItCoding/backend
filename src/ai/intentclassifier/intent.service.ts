@@ -1,5 +1,5 @@
 // src/ai/intentclassifier/intent.service.ts
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { OpenAIClient } from '../openai/openai.client';
 import { INTENT_JSON_SCHEMA, IntentOutput } from './intent.schema';
 import { z } from 'zod';
@@ -18,20 +18,31 @@ import {
   CONVERSATION_SYSTEM_PROMPT,
   buildConversationUserPrompt,
 } from './prompt';
+import { MissionService } from 'src/mission/mission.service';
+import { MissionCode } from 'src/mission/entity/mission-code.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 // Zod 스키마에서 타입 뽑아오기
 export type IntentOutputT = z.infer<typeof IntentOutput>;
 
 @Injectable()
 export class IntentService {
-  constructor(private readonly openai: OpenAIClient) {}
+  constructor(
+    @InjectRepository(MissionCode)
+    private missionCodeRepo: Repository<MissionCode>,
+    private readonly openai: OpenAIClient,
+
+    @Inject(forwardRef(() => MissionService))
+    private readonly missionService: MissionService,
+  ) {}
 
   async classify(
     utterance: string,
     projectData: any,
-    map: string,
-    char_location: string,
-    direction: string,
+    map?: string,
+    char_location?: string,
+    direction?: string,
   ): Promise<IntentOutputT> {
     const client = this.openai.getClient();
 
@@ -82,9 +93,9 @@ export class IntentService {
     utterance: string,
     intent: IntentOutputT,
     projectData: any,
-    map: string,
-    char_location: string,
-    direction: string,
+    map?: string,
+    char_location?: string,
+    direction?: string,
   ): Promise<string> {
     const client = this.openai.getClient();
 
@@ -121,14 +132,30 @@ export class IntentService {
     return text.trim();
   }
 
-  async process(
-    userId: number,
-    utterance: string,
-    projectData: any,
-    map: string,
-    char_location: string,
-    direction: string,
-  ) {
+  async process(params: {
+    missionId: number;
+    latestMissionCodeId: number | null;
+    utterance: string;
+    map?: string;
+    char_location?: string;
+    direction?: string;
+  }) {
+    const {
+      missionId,
+      latestMissionCodeId,
+      utterance,
+      map,
+      char_location,
+      direction,
+    } = params;
+    let projectData;
+    // 아무 코드가 없으면 mission의 기본 projectData 불러오기
+    if (latestMissionCodeId != null) {
+      projectData = await this.missionService.getDefaultProjectData(missionId);
+    } else {
+      projectData = await this.missionCodeRepo.find;
+    }
+
     // 1) Intent 분류 + slot 추출
     const intentOutput = await this.classify(
       utterance,

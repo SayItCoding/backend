@@ -20,9 +20,9 @@ export const INTENT_SYSTEM_PROMPT = `
  */
 export function buildIntentUserPrompt(
   codeSummary: string,
-  map: string,
-  char_location: string,
-  direction: string,
+  map?: string,
+  char_location?: string,
+  direction?: string,
 ): string {
   return `
 ## 컨텍스트
@@ -178,9 +178,9 @@ export function buildConversationUserPrompt(
   utterance: string,
   intentJson: any,
   codeSummary: string,
-  map: string,
-  char_location: string,
-  direction: string,
+  map?: string,
+  char_location?: string,
+  direction?: string,
 ): string {
   return `
 [사용자 입력]

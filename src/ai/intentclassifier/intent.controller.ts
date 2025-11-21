@@ -11,19 +11,4 @@ export class IntentController {
   test() {
     return 'intent classifier';
   }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('/process')
-  async process(@Body() body, @Req() req) {
-    const { utterance, projectData, map, char_location, direction } = body;
-    const userId = req.user.userId ?? req.user.id;
-    return this.intentService.process(
-      userId,
-      utterance,
-      projectData,
-      map,
-      char_location,
-      direction,
-    );
-  }
 }

@@ -13,9 +13,6 @@ export class MissionCode {
   @Column()
   userMissionId: number;
 
-  @Column()
-  missionId: number;
-
   @Column({ type: 'jsonb' })
   projectData: any;
 

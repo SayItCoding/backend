@@ -9,7 +9,9 @@ import {
 import { Mission } from './entity/mission.entity';
 import { UserMission } from './entity/user-mission.entity';
 import { MissionChat } from './entity/mission-chat.entity';
+import { MissionCode } from './entity/mission-code.entity';
 import { IntentService } from 'src/ai/intentclassifier/intent.service';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class MissionService {
@@ -20,8 +22,63 @@ export class MissionService {
     private readonly userMissionRepo: Repository<UserMission>,
     @InjectRepository(MissionChat)
     private readonly missionChatRepo: Repository<MissionChat>,
+    @InjectRepository(MissionCode)
+    private readonly missionCodeRepo: Repository<MissionCode>,
     private readonly intentService: IntentService,
   ) {}
+
+  /** 미션의 기본 projectData(JSON)를 반환 */
+  async getDefaultProjectData(missionId: number): Promise<any> {
+    const mission = await this.missionRepo.findOne({
+      where: { id: missionId },
+    });
+
+    if (!mission) {
+      throw new Error(`Mission ${missionId} not found`);
+    }
+
+    let json = mission.projectData;
+
+    // 문자열이면 파싱
+    if (typeof json === 'string') {
+      try {
+        json = JSON.parse(json);
+      } catch (e) {
+        console.error('기본 projectData 파싱 실패:', e);
+      }
+    }
+
+    return json;
+  }
+
+  private buildEmptyPagination<T>(options: IPaginationOptions): Pagination<T> {
+    const limit =
+      typeof options.limit === 'string'
+        ? parseInt(options.limit, 10)
+        : options.limit;
+
+    const page =
+      typeof options.page === 'string'
+        ? parseInt(options.page, 10)
+        : options.page;
+
+    return {
+      items: [],
+      meta: {
+        itemCount: 0,
+        totalItems: 0,
+        itemsPerPage: limit,
+        totalPages: 0,
+        currentPage: page,
+      },
+      links: {
+        first: '',
+        previous: '',
+        next: '',
+        last: '',
+      },
+    };
+  }
 
   async paginate(
     options: IPaginationOptions,
@@ -33,7 +90,20 @@ export class MissionService {
       where.category = filter.category;
     }
 
-    return paginate<Mission>(this.missionRepo, options, { where });
+    return paginate<Mission>(this.missionRepo, options, {
+      where,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        thumbnailUrl: true,
+        category: true,
+        difficulty: true,
+        createdAt: true,
+        updatedAt: true,
+        //projectData 생략
+      },
+    });
   }
 
   async paginateQB(options: IPaginationOptions): Promise<Pagination<Mission>> {
@@ -78,20 +148,15 @@ export class MissionService {
       where: { userId, missionId },
     });
 
-    if (!membership) {
-      membership = this.userMissionRepo.create({
-        userId,
-        missionId,
-        isCompleted: false,
-      });
-      await this.userMissionRepo.save(membership);
-    }
-
     const options: IPaginationOptions = {
       page,
       limit,
       route: `/api/v1/missions/${missionId}/chats`,
     };
+
+    if (!membership) {
+      return this.buildEmptyPagination<MissionChat>(options);
+    }
 
     return this.paginateUserMissionChats(membership.id, options);
   }
@@ -110,20 +175,41 @@ export class MissionService {
     });
     if (!membership) throw new ForbiddenException('No access to this mission');
 
-    // TODO : user의 입력으로 ai답변을 출력하는 로직 작성
-    const reply = `${message} 에 대한 테스트 답변입니다.`;
+    const AIResult = await this.intentService.process({
+      missionId,
+      latestMissionCodeId: membership.latestMissionCodeId ?? null,
+      utterance: message,
+    });
 
-    // TODO : ai답변이 출력되었다면 user의답변과 ai답변을 db에 저장
+    const assistantMessage = AIResult.message;
+    const updatedProjectData = AIResult.projectData; // 변경된 코드 | null
+
+    if (updatedProjectData != null) {
+      const newMissionCode = this.missionCodeRepo.create({
+        userMissionId: membership.id,
+        projectData: updatedProjectData,
+      });
+      await this.missionCodeRepo.save(newMissionCode);
+
+      // user_missions.latestMissionCodeId 갱신
+      membership.latestMissionCodeId = newMissionCode.id;
+      await this.userMissionRepo.save(membership);
+    }
+
+    // user 메시지 저장
     const userChat = this.missionChatRepo.create({
       userMissionId: membership.id,
+      missionCodeId: membership.latestMissionCodeId,
       content: message,
       role: 'user',
     });
     await this.missionChatRepo.save(userChat);
 
+    // assistant 메시지 저장
     const assistantChat = this.missionChatRepo.create({
       userMissionId: membership.id,
-      content: reply,
+      missionCodeId: membership.latestMissionCodeId,
+      content: assistantMessage,
       role: 'assistant',
     });
     await this.missionChatRepo.save(assistantChat);
@@ -131,6 +217,7 @@ export class MissionService {
     return {
       missionId,
       userMissionId: membership.id,
+      missionCodeId: membership.latestMissionCodeId, // 이 대화까지의 코드 스냅샷 ID
       items: [
         {
           id: userChat.id,
@@ -145,6 +232,44 @@ export class MissionService {
           createdAt: assistantChat.createdAt,
         },
       ],
+    };
+  }
+
+  async getMissionCodeById(params: {
+    userId: number;
+    missionId: number;
+    missionCodeId: number;
+  }) {
+    const { userId, missionId, missionCodeId } = params;
+
+    // userMission 존재 확인
+    const membership = await this.userMissionRepo.findOne({
+      where: { userId, missionId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this mission');
+    }
+
+    // missionCode가 해당 userMission의 것인지 확인
+    const missionCode = await this.missionCodeRepo.findOne({
+      where: {
+        id: missionCodeId,
+        userMissionId: membership.id,
+      },
+    });
+
+    if (!missionCode) {
+      throw new NotFoundException(
+        `Mission code ${missionCodeId} not found for this mission`,
+      );
+    }
+
+    return {
+      missionId,
+      missionCodeId,
+      projectData: missionCode.projectData,
+      createdAt: missionCode.createdAt,
     };
   }
 }
