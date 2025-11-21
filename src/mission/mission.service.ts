@@ -116,8 +116,6 @@ export class MissionService {
     // TODO : ai답변이 출력되었다면 user의답변과 ai답변을 db에 저장
     const userChat = this.missionChatRepo.create({
       userMissionId: membership.id,
-      userId,
-      missionId,
       content: message,
       role: 'user',
     });
@@ -125,8 +123,6 @@ export class MissionService {
 
     const assistantChat = this.missionChatRepo.create({
       userMissionId: membership.id,
-      userId,
-      missionId,
       content: reply,
       role: 'assistant',
     });

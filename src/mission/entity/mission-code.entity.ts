@@ -5,22 +5,19 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
-@Entity('mission_chats')
-export class MissionChat {
+@Entity('mission_codes')
+export class MissionCode {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
   userMissionId: number;
 
-  @Column({ nullable: true })
-  missionCodeId: number;
-
   @Column()
-  content: string; // 메시지
+  missionId: number;
 
-  @Column()
-  role: 'user' | 'assistant'; // 누가 보낸 메시지인지
+  @Column({ type: 'jsonb' })
+  projectData: any;
 
   @CreateDateColumn()
   createdAt: Date;

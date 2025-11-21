@@ -16,11 +16,16 @@ export class Mission {
   @Column()
   title: string;
 
-  @Column()
+  @Column({ nullable: true })
   description?: string;
 
-  @Column()
+  @Column({ nullable: true })
+  thumbnailUrl?: string;
+
+  @Column({ nullable: true })
   category?: string;
+
+  difficulty: number;
 
   // Entry 프로젝트 데이터 (JSON)
   @Column({ type: 'jsonb', name: 'projectdata' })

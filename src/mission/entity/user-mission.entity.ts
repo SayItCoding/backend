@@ -23,6 +23,9 @@ export class UserMission {
   @Column()
   missionId: number;
 
+  @Column({ nullable: true })
+  latestMissionCodeId: number;
+
   @Column()
   isCompleted: boolean;
 
