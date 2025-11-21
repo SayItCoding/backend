@@ -72,12 +72,14 @@ export class MissionController {
   createChatAndReply(
     @Param('missionId', ParseIntPipe) missionId: number,
     @Body('content') message: string,
+    @Body('selectedCodeId') missionCodeId: number | null,
     @Req() req: any,
   ) {
     return this.missionService.createChatAndReply({
       userId: req.user.userId,
       missionId,
       message,
+      missionCodeId,
     });
   }
 

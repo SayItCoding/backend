@@ -205,8 +205,9 @@ export class MissionService {
     userId: number;
     missionId: number;
     message: string;
+    missionCodeId: number | null;
   }) {
-    const { userId, missionId, message } = params;
+    const { userId, missionId, message, missionCodeId } = params;
 
     // 권한 확인
     const membership = await this.userMissionRepo.findOne({
@@ -214,9 +215,12 @@ export class MissionService {
     });
     if (!membership) throw new ForbiddenException('No access to this mission');
 
+    // 어떤 코드를 기준으로 수정할 지 결정
+    const baseCodeId = missionCodeId ?? membership.latestMissionCodeId ?? null;
+
     const AIResult = await this.intentService.process({
       missionId,
-      latestMissionCodeId: membership.latestMissionCodeId ?? null,
+      latestMissionCodeId: baseCodeId,
       utterance: message,
     });
 
