@@ -232,6 +232,7 @@ export class MissionService {
           createdAt: assistantChat.createdAt,
         },
       ],
+      projectData: updatedProjectData,
     };
   }
 
