@@ -15,6 +15,7 @@ import { MissionService } from './mission.service';
 import { Pagination } from 'nestjs-typeorm-paginate';
 import { Mission } from './entity/mission.entity';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { JwtOptionalAuthGuard } from 'src/auth/jwt-optional.guard';
 
 @Controller('/api/v1/missions')
 export class MissionController {
@@ -38,13 +39,13 @@ export class MissionController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOptionalAuthGuard)
   @Get(':missionId')
   findOne(
     @Param('missionId', ParseIntPipe) missionId: number,
     @Req() req: any,
   ) {
-    const userId = req.user.userId;
+    const userId = req.user?.userId ?? null;
     return this.missionService.findOne(userId, missionId);
   }
 
