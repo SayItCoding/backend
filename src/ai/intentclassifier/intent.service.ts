@@ -150,10 +150,15 @@ export class IntentService {
     } = params;
     let projectData;
     // 아무 코드가 없으면 mission의 기본 projectData 불러오기
-    if (latestMissionCodeId != null) {
+    if (latestMissionCodeId == null) {
+      // 아직 유저 코드가 없으니 기본 projectData
       projectData = await this.missionService.getDefaultProjectData(missionId);
     } else {
-      projectData = await this.missionCodeRepo.find;
+      // 유저가 마지막으로 사용한 코드 스냅샷을 DB에서 읽어오기
+      const latest = await this.missionCodeRepo.findOne({
+        where: { id: latestMissionCodeId },
+      });
+      projectData = latest?.projectData;
     }
 
     // 1) Intent 분류 + slot 추출
