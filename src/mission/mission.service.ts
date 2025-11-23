@@ -210,10 +210,16 @@ export class MissionService {
     const { userId, missionId, message, missionCodeId } = params;
 
     // 권한 확인
-    const membership = await this.userMissionRepo.findOne({
+    let membership = await this.userMissionRepo.findOne({
       where: { userId, missionId },
     });
-    if (!membership) throw new ForbiddenException('No access to this mission');
+    if (!membership) {
+      membership = this.userMissionRepo.create({
+        userId,
+        missionId,
+      });
+      membership = await this.userMissionRepo.save(membership);
+    }
 
     // 어떤 코드를 기준으로 수정할 지 결정
     const baseCodeId = missionCodeId ?? membership.latestMissionCodeId ?? null;
