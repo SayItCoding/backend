@@ -1,10 +1,10 @@
 import { EntryBlock, Slot, genId, withDefaults } from './blockTypes';
 
-function numberBlock(value: number): EntryBlock {
+function numberBlock(value?: number): EntryBlock {
   return withDefaults({ id: genId('num'), type: 'number', params: [value] });
 }
 
-function angleBlock(value: number): EntryBlock {
+function angleBlock(value?: number): EntryBlock {
   return withDefaults({ id: genId('angle'), type: 'angle', params: [value] });
 }
 
@@ -12,17 +12,19 @@ function moveBlock(direction: 'forward'): EntryBlock {
   // steps=1 고정 (원하면 슬롯에 steps 추가해서 확장)
   return withDefaults({
     id: genId('move'),
-    type: 'move_direction',
-    params: [numberBlock(1)],
+    type: 'move_forward',
+    params: [numberBlock()],
   });
 }
 
 function turnBlock(direction: 'left' | 'right'): EntryBlock {
-  // 우선 turn_direction(direction, 90). 환경에 없으면 rotate_by_angle로 대체
+  const blockType =
+    direction == 'left' ? 'rotate_direction_left' : 'rotate_direction_right';
+
   return withDefaults({
     id: genId('turn'),
-    type: 'direction_relative',
-    params: [angleBlock(90)],
+    type: blockType,
+    params: [angleBlock()],
   });
 }
 
