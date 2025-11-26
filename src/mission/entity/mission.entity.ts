@@ -40,6 +40,14 @@ export class Mission {
     interface: any[]; // 인터페이스 정보
   };
 
+  @Column({ type: 'jsonb' })
+  context: {
+    map: string[][];
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+    initalDirection: '+x' | '-x' | '+y' | '-y';
+  };
+
   @CreateDateColumn()
   createdAt: Date;
 
