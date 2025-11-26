@@ -7,10 +7,11 @@ import { IntentLog } from './intent-log.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MissionModule } from 'src/mission/mission.module';
 import { MissionCode } from 'src/mission/entity/mission-code.entity';
+import { Mission } from 'src/mission/entity/mission.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MissionCode, IntentLog]),
+    TypeOrmModule.forFeature([Mission, MissionCode, IntentLog]),
     forwardRef(() => MissionModule),
   ],
   controllers: [IntentController],

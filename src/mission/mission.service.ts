@@ -322,4 +322,13 @@ export class MissionService {
       createdAt: missionCode.createdAt,
     };
   }
+
+  async getMissionContext(missionId: number): Promise<any | null> {
+    const mission = await this.missionRepo.findOne({
+      where: { id: missionId },
+      select: ['id', 'context'],
+    });
+
+    return mission?.context ?? null;
+  }
 }

@@ -23,6 +23,14 @@ import { MissionCode } from 'src/mission/entity/mission-code.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 
+type MissionContext = {
+  map?: string[][];
+  start?: { x: number; y: number };
+  goal?: { x: number; y: number };
+  end?: { x: number; y: number };
+  initialDirection?: string;
+};
+
 // Zod 스키마에서 타입 뽑아오기
 export type SlotT = z.infer<typeof Slot>;
 export type IntentOutputT = z.infer<typeof IntentOutput>;
@@ -70,9 +78,7 @@ export class IntentService {
     utterance: string,
     intentOutput: IntentOutputT,
     projectData: any,
-    map?: string,
-    char_location?: string,
-    direction?: string,
+    missionContext?: MissionContext,
   ): Promise<string> {
     const client = this.openai.getClient();
 
@@ -85,10 +91,9 @@ export class IntentService {
       utterance,
       intentOutput,
       codeSummary,
-      map,
-      char_location,
-      direction,
+      missionContext,
     );
+    console.log('conversation userPrompt', userPrompt);
 
     const response = await client.responses.create({
       model: 'gpt-4o-mini',
@@ -106,18 +111,11 @@ export class IntentService {
     missionId: number;
     latestMissionCodeId: number | null;
     utterance: string;
-    map?: string;
-    char_location?: string;
-    direction?: string;
   }) {
-    const {
-      missionId,
-      latestMissionCodeId,
-      utterance,
-      map,
-      char_location,
-      direction,
-    } = params;
+    const { missionId, latestMissionCodeId, utterance } = params;
+
+    const missionContext =
+      await this.missionService.getMissionContext(missionId);
 
     let projectData;
     // 아무 코드가 없으면 mission의 기본 projectData 불러오기
@@ -173,9 +171,7 @@ export class IntentService {
       utterance,
       intentOutput,
       updatedProjectData, // 최신 코드 상태
-      map,
-      char_location,
-      direction,
+      missionContext, // 컨텍스트 반영
     );
     const end2 = performance.now();
     console.log('대화 처리 응답 시간:', end2 - start2, 'ms');
