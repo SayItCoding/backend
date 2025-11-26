@@ -8,18 +8,17 @@ function angleBlock(value?: number): EntryBlock {
   return withDefaults({ id: genId('angle'), type: 'angle', params: [value] });
 }
 
-function moveBlock(direction: 'forward'): EntryBlock {
-  // steps=1 고정 (원하면 슬롯에 steps 추가해서 확장)
+function moveBlock(action: 'move_forward'): EntryBlock {
   return withDefaults({
     id: genId('move'),
-    type: 'move_forward',
+    type: action,
     params: [numberBlock()],
   });
 }
 
-function turnBlock(direction: 'left' | 'right'): EntryBlock {
+function turnBlock(action: 'turn_left' | 'turn_right'): EntryBlock {
   const blockType =
-    direction == 'left' ? 'rotate_direction_left' : 'rotate_direction_right';
+    action == 'turn_left' ? 'rotate_direction_left' : 'rotate_direction_right';
 
   return withDefaults({
     id: genId('turn'),
@@ -57,51 +56,48 @@ export function createTriggerBlock() {
 }
 
 /** 슬롯을 기반으로 “추가할 블록들”을 만든다. (트리거 제외) */
-export function buildBlocksFromSlots(slot: Slot): EntryBlock[] {
-  const action = slot.action ?? 'move';
+export function buildBlocksFromSlot(slot: Slot): EntryBlock[] {
+  if (!slot.action) return [];
+
+  const action = slot.action;
   const count = Math.max(1, slot.count ?? 1);
   const loop = slot.loop_explicit;
-  const dirRaw = slot.direction ?? 'forward';
-  // move는 모든 방향 허용, turn은 left/right만 허용
-  const dirMove = (
-    ['forward', 'backward', 'left', 'right'].includes(dirRaw)
-      ? dirRaw
-      : 'forward'
-  ) as any;
-  const dirTurn = (dirRaw === 'right' ? 'right' : 'left') as 'left' | 'right';
 
   switch (action) {
-    case 'move': {
+    case 'move_forward': {
       if (loop) {
-        const inner = [moveBlock(dirMove)];
+        const inner = [moveBlock('move_forward')];
         return [repeatBlock(count, inner)];
       }
       const blocks: EntryBlock[] = [];
       for (let i = 0; i < count; i++) {
-        blocks.push(moveBlock(dirMove));
+        blocks.push(moveBlock('move_forward'));
       }
       return blocks;
     }
-    case 'turn': {
+    case 'turn_left': {
       if (loop) {
-        const inner = [turnBlock(dirTurn)];
+        const inner = [turnBlock('turn_left')];
         return [repeatBlock(count, inner)];
       }
       const blocks: EntryBlock[] = [];
       for (let i = 0; i < count; i++) {
-        blocks.push(turnBlock(dirTurn));
+        blocks.push(turnBlock('turn_left'));
       }
       return blocks;
     }
-    case 'repeat': {
-      // 기본 동작: forward 1칸
-      const inner = [moveBlock('forward')];
-      return [repeatBlock(count, inner)];
+    case 'turn_right': {
+      if (loop) {
+        const inner = [turnBlock('turn_right')];
+        return [repeatBlock(count, inner)];
+      }
+      const blocks: EntryBlock[] = [];
+      for (let i = 0; i < count; i++) {
+        blocks.push(turnBlock('turn_right'));
+      }
+      return blocks;
     }
-    default: {
-      // 안전 기본: move forward
-      const inner = [moveBlock('forward')];
-      return [repeatBlock(count, inner)];
-    }
+    default:
+      return [];
   }
 }

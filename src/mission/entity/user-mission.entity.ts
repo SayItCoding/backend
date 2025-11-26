@@ -26,7 +26,7 @@ export class UserMission {
   @Column({ nullable: true })
   latestMissionCodeId: number;
 
-  @Column()
+  @Column({ default: false })
   isCompleted: boolean;
 
   @CreateDateColumn()

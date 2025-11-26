@@ -1,5 +1,5 @@
 export type Slot = {
-  action: 'move' | 'turn' | 'repeat' | null;
+  action: 'move_forward' | 'turn_left' | 'turn_right' | null;
   count: number | null; // null이면 1
   direction: 'forward' | 'backward' | 'left' | 'right' | null; // null이면 forward
   loop_explicit: boolean;
