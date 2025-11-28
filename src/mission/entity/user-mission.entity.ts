@@ -6,10 +6,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { Mission } from './mission.entity';
 import { User } from '../../user/entity/user.entity';
+import { MissionChat } from './mission-chat.entity';
+import { MissionCode } from './mission-code.entity';
 
 @Entity('user_missions')
 @Unique(['userId', 'missionId'])
@@ -49,4 +52,10 @@ export class UserMission {
   })
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @OneToMany(() => MissionChat, (chat) => chat.userMission)
+  missionChats: MissionChat[];
+
+  @OneToMany(() => MissionCode, (code) => code.userMission)
+  missionCodes: MissionCode[];
 }

@@ -7,8 +7,18 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 export class IntentController {
   constructor(private readonly intentService: IntentService) {}
 
+  @Get('/classify')
+  classifyTest(@Body('content') utterance: string) {
+    return this.intentService.classify(utterance);
+  }
+
+  @Get('/conversation')
+  conversationTest() {
+    return;
+  }
+
   @Get()
-  test() {
-    return 'intent classifier';
+  processTest(@Body('content') utterance: string) {
+    return;
   }
 }

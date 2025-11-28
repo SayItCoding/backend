@@ -232,10 +232,11 @@ export class MissionService {
 
     const assistantMessage = AIResult.message;
     const updatedProjectData = AIResult.projectData; // 변경된 코드 | null
+    const didChangeCode = AIResult.didChangeCode ?? false;
 
-    if (updatedProjectData != null) {
+    if (didChangeCode) {
       const newMissionCode = this.missionCodeRepo.create({
-        userMissionId: membership.id,
+        userMission: membership,
         projectData: updatedProjectData,
       });
       await this.missionCodeRepo.save(newMissionCode);
@@ -247,7 +248,7 @@ export class MissionService {
 
     // user 메시지 저장
     const userChat = this.missionChatRepo.create({
-      userMissionId: membership.id,
+      userMission: membership,
       missionCodeId: membership.latestMissionCodeId,
       content: message,
       role: 'user',
@@ -256,7 +257,7 @@ export class MissionService {
 
     // assistant 메시지 저장
     const assistantChat = this.missionChatRepo.create({
-      userMissionId: membership.id,
+      userMission: membership,
       missionCodeId: membership.latestMissionCodeId,
       content: assistantMessage,
       role: 'assistant',
@@ -305,7 +306,7 @@ export class MissionService {
     const missionCode = await this.missionCodeRepo.findOne({
       where: {
         id: missionCodeId,
-        userMissionId: membership.id,
+        userMission: { id: membership.id },
       },
     });
 

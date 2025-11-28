@@ -3,15 +3,15 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { UserMission } from './user-mission.entity';
 
 @Entity('mission_chats')
 export class MissionChat {
   @PrimaryGeneratedColumn()
   id: number;
-
-  @Column()
-  userMissionId: number;
 
   @Column({ nullable: true })
   missionCodeId: number;
@@ -24,4 +24,10 @@ export class MissionChat {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @ManyToOne(() => UserMission, (userMission) => userMission.missionChats, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'userMissionId' })
+  userMission: UserMission;
 }

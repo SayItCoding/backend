@@ -1,8 +1,13 @@
 export type Slot = {
   action: 'move_forward' | 'turn_left' | 'turn_right' | null;
   count: number | null; // null이면 1
-  direction: 'forward' | 'backward' | 'left' | 'right' | null; // null이면 forward
-  loop_explicit: boolean;
+  loopExplicit: boolean | null;
+  loopCount: number | null;
+  targetScope: string | null;
+  rangeAnchor: string | null;
+  rangeCount: number | null;
+  rangeIndexFrom: number | null;
+  rangeIndexTo: number | null;
 };
 
 export type EntryBlock = {

@@ -1,8 +1,7 @@
 // src/ai/intentclassifier/intent.service.ts
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { OpenAIClient } from '../openai/openai.client';
-import { INTENT_JSON_SCHEMA, Slot, IntentOutput } from './intent.schema';
-import { z } from 'zod';
+import { INTENT_JSON_SCHEMA, IntentItem, IntentItemT } from './intent.schema';
 import {
   createTriggerBlock,
   buildBlocksFromSlot,
@@ -31,10 +30,6 @@ type MissionContext = {
   initialDirection?: string;
 };
 
-// Zod 스키마에서 타입 뽑아오기
-export type SlotT = z.infer<typeof Slot>;
-export type IntentOutputT = z.infer<typeof IntentOutput>;
-
 @Injectable()
 export class IntentService {
   constructor(
@@ -46,7 +41,7 @@ export class IntentService {
     private readonly missionService: MissionService,
   ) {}
 
-  async classify(utterance: string): Promise<IntentOutputT> {
+  async classify(utterance: string): Promise<IntentItemT> {
     const client = this.openai.getClient();
 
     const systemPrompt = INTENT_SYSTEM_PROMPT;
@@ -61,7 +56,7 @@ export class IntentService {
       text: {
         format: {
           type: 'json_schema',
-          name: 'IntentOutput',
+          name: 'IntentItem',
           schema: INTENT_JSON_SCHEMA,
           strict: true,
         },
@@ -69,14 +64,14 @@ export class IntentService {
     });
 
     const jsonText = response.output_text!;
-    const intentOutput = IntentOutput.parse(JSON.parse(jsonText));
+    const intentItem = IntentItem.parse(JSON.parse(jsonText));
 
-    return intentOutput;
+    return intentItem;
   }
 
   async conversation(
     utterance: string,
-    intentOutput: IntentOutputT,
+    intentItem: IntentItemT,
     projectData: any,
     missionContext?: MissionContext,
   ): Promise<string> {
@@ -89,11 +84,11 @@ export class IntentService {
     const systemPrompt = CONVERSATION_SYSTEM_PROMPT;
     const userPrompt = buildConversationUserPrompt(
       utterance,
-      intentOutput,
+      intentItem,
       codeSummary,
       missionContext,
     );
-    console.log('conversation userPrompt', userPrompt);
+    //console.log('conversation userPrompt', userPrompt);
 
     const response = await client.responses.create({
       model: 'gpt-4o-mini',
@@ -130,21 +125,28 @@ export class IntentService {
       projectData = latest?.projectData;
     }
 
+    //console.log(projectData);
+
     const start1 = performance.now();
     // 1) Intent 분류 + slot 추출
-    const intentOutput = await this.classify(utterance);
+    const intentItem = await this.classify(utterance);
     const end1 = performance.now();
     console.log('의도 분류 응답 시간:', end1 - start1, 'ms');
-    console.log(intentOutput);
+    //console.log(intentOutput);
 
     let updatedProjectData = projectData;
+    let didChangeCode = false;
 
-    // 2) slots 순서대로 적용 : intent → 코드 처리
-    if (intentOutput.slots && intentOutput.slots.length > 0) {
-      for (const slot of intentOutput.slots) {
-        switch (slot.intent) {
-          case 'MAKE_CODE': {
-            updatedProjectData = await this.handleMakeCodeFromSlot(
+    const isTaskCode = intentItem.globalIntent === 'TASK_CODE';
+    // 2) TASK_CODE 인 경우 slots을 사용해 코드 변경
+    if (isTaskCode && intentItem.slots && intentItem.slots.length > 0) {
+      for (const slot of intentItem.slots) {
+        if (slot.needsClarification) continue; // 모호한 slot은 적용 X
+
+        const before = updatedProjectData;
+        switch (slot.taskType) {
+          case 'CREATE_CODE': {
+            updatedProjectData = await this.handleCreateCodeFromSlot(
               updatedProjectData,
               slot,
             );
@@ -159,34 +161,57 @@ export class IntentService {
             break;
           }
 
+          case 'DELETE_CODE': {
+            updatedProjectData = await this.handleDeleteCodeFromSlot(
+              updatedProjectData,
+              slot,
+            );
+            break;
+          }
+
+          case 'REFACTOR_CODE': {
+            updatedProjectData = await this.handleRefactorCodeFromSlot(
+              updatedProjectData,
+              slot,
+            );
+            break;
+          }
+
           default:
             break;
         }
+        // object reference가 바뀌었으면 코드 변경이 일어났다고 간주
+        if (updatedProjectData !== before) {
+          didChangeCode = true;
+        }
       }
+    } else {
+      // TASK_CODE가 아니면 코드 변경 없음
     }
 
     const start2 = performance.now();
     // 3) 자연어 답변 생성
     const message = await this.conversation(
       utterance,
-      intentOutput,
-      updatedProjectData, // 최신 코드 상태
+      intentItem,
+      updatedProjectData, // 최신 코드 상태 (또는 변경 없음)
       missionContext, // 컨텍스트 반영
     );
     const end2 = performance.now();
     console.log('대화 처리 응답 시간:', end2 - start2, 'ms');
 
-    // TODO: DB에 해당 로그 저장
+    // TODO: DB에 api 처리 결과 로그 저장
 
     // 4) 통합 응답
     return {
-      intent: intentOutput,
+      intent: intentItem,
       message,
       projectData: updatedProjectData,
+      didChangeCode,
     };
   }
 
-  private async handleMakeCodeFromSlot(projectData?: any, slot?: any) {
+  private async handleCreateCodeFromSlot(projectData?: any, slot?: any) {
     //console.log('handleMakeCodeFromSlot', { slot });
 
     // 1) script 파싱 (objects[0].script 기준)
@@ -215,31 +240,27 @@ export class IntentService {
     console.log('handle Edit Code');
   }
 
-  private async handleQuestion(
-    input: { projectData?: any },
-    intent: IntentOutputT,
-  ) {
+  private async handleDeleteCodeFromSlot(projectData?: any, slot?: any) {
+    console.log('handle Delete Code');
+  }
+
+  private async handleRefactorCodeFromSlot(projectData?: any, slot?: any) {
+    console.log('handle Refactor Code');
+  }
+
+  private async handleQuestion() {
     console.log('handle Question');
   }
 
-  private async handleExplanation(
-    input: { projectData?: any },
-    intent: IntentOutputT,
-  ) {
+  private async handleExplanation() {
     console.log('handle Explanation');
   }
 
-  private async handleOther(
-    input: { projectData?: any },
-    intent: IntentOutputT,
-  ) {
+  private async handleOther() {
     console.log('handle Other');
   }
 
-  private async handleUnknown(
-    input: { projectData?: any },
-    intent: IntentOutputT,
-  ) {
+  private async handleUnknown() {
     console.log('handle Unknown');
   }
 }

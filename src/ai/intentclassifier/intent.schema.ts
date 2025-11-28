@@ -1,46 +1,80 @@
 // src/ai/intentclassifier/intent.schema.ts
 import * as z from 'zod';
 
-// 개별 슬롯(한 개의 명령 단위)
+/**
+ * 개별 Slot (한 문장 안의 “행동/요청” 최소 단위)
+ */
 export const Slot = z.object({
-  intent: z.enum(['MAKE_CODE', 'EDIT_CODE']),
+  // 코드 작업 종류
+  taskType: z
+    .enum(['CREATE_CODE', 'EDIT_CODE', 'DELETE_CODE', 'REFACTOR_CODE'])
+    .nullable(),
+
+  // 실제 행동 블록
   action: z.enum(['move_forward', 'turn_left', 'turn_right']).nullable(),
+
+  // 한 번 실행 시 몇 칸/몇 회
   count: z.number().int().positive().nullable(),
-  repeat: z.number().int().positive().nullable(),
-  target: z.string().nullable(), // "SELECTED_BLOCK" 같은 값 사용 예정
-  loop_explicit: z.boolean().default(false),
-  reasoning: z.string(),
-  alternatives: z.array(z.string()).default([]),
-  needs_clarification: z.boolean().default(false),
+
+  // 반복 의도
+  loopExplicit: z.boolean().nullable(),
+
+  // 몇 번 반복할지
+  loopCount: z.number().int().positive().nullable(),
+
+  // 코드 대상 범위
+  targetScope: z.enum(['SELECTED_BLOCK', 'BLOCK_RANGE', 'ALL_CODE']).nullable(),
+
+  // BLOCK_RANGE 상세 정보
+  rangeAnchor: z.enum(['HEAD', 'TAIL']).nullable(),
+  rangeCount: z.number().int().positive().nullable(),
+  rangeIndexFrom: z.number().int().positive().nullable(),
+  rangeIndexTo: z.number().int().positive().nullable(),
+
+  // 질문 유형
+  questionType: z
+    .enum([
+      'WHY_WRONG',
+      'HOW_TO_FIX',
+      'WHAT_IS_CONCEPT',
+      'DIFFERENCE_CONCEPT',
+      'REQUEST_HINT',
+      'REQUEST_EXPLANATION',
+    ])
+    .nullable(),
+
+  // 이 slot에 대응하는 원문 일부
+  rawSpan: z.string().nullable(),
+
+  // 이 해석을 한 이유(간단 설명)
+  reasoning: z.string().nullable(),
+
+  // 학생에게 추가로 물어봐야 할 정도로 모호한지
+  needsClarification: z.boolean().nullable(),
 });
 
-// 런타임 검증용(Zod v4)
+/**
+ * Intent 전체 구조
+ */
 export const IntentItem = z.object({
-  type: z.enum([
-    'MAKE_CODE',
-    'EDIT_CODE',
-    'QUESTION',
-    'EXPLANATION',
+  globalIntent: z.enum([
+    'TASK_CODE',
+    'QUESTION_DEBUG',
+    'QUESTION_CONCEPT',
+    'QUESTION_MISSION_HINT',
+    'EXPLANATION_CODE',
+    'EXPLANATION_FEEDBACK',
+    'SMALL_TALK',
     'OTHER',
     'UNKNOWN',
   ]),
-  confidence: z.number().min(0).max(1),
+  slots: z.array(Slot).default([]),
+  confidence: z.number().min(0).max(1).default(0.8),
 });
 
-// 전체 출력 (slots를 배열로 변경)
-export const IntentOutput = z.object({
-  primary: IntentItem.shape.type,
-  intents: z.array(IntentItem).length(6),
-  reasoning: z.string(),
-  alternatives: z.array(IntentItem).optional().default([]),
+export type IntentItemT = z.infer<typeof IntentItem>;
 
-  // 여러 명령을 담는 배열
-  slots: z.array(Slot),
-
-  needs_clarification: z.boolean(),
-});
-
-export type SlotT = z.infer<typeof Slot>;
-export type IntentOutputT = z.infer<typeof IntentOutput>;
-
-export const INTENT_JSON_SCHEMA = z.toJSONSchema(IntentOutput);
+/**
+ * OpenAI responses용 JSON Schema
+ */
+export const INTENT_JSON_SCHEMA = z.toJSONSchema(IntentItem);
