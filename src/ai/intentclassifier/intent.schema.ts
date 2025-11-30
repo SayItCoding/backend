@@ -13,6 +13,8 @@ export const Slot = z.object({
   // 실제 행동 블록
   action: z.enum(['move_forward', 'turn_left', 'turn_right']).nullable(),
 
+  editMode: z.enum(['INSERT', 'REPLACE']).nullable(),
+
   // 한 번 실행 시 몇 칸/몇 회
   count: z.number().int().positive().nullable(),
 

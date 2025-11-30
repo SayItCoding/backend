@@ -57,3 +57,45 @@ export function applyScripts(
     ),
   };
 }
+
+export function insertBlocksAt(
+  mainScript: any[],
+  index: number,
+  blocks: any[],
+): any[] {
+  const before = mainScript.slice(0, index);
+  const after = mainScript.slice(index);
+  return [...before, ...blocks, ...after];
+}
+
+export function replaceBlocksAt(
+  mainScript: any[],
+  index: number,
+  blocks: any[],
+  deleteCount = 1,
+): any[] {
+  if (index < 0 || index >= mainScript.length) return mainScript;
+  const before = mainScript.slice(0, index);
+  const after = mainScript.slice(index + deleteCount);
+  return [...before, ...blocks, ...after];
+}
+
+export function deleteBlocksRange(
+  mainScript: any[],
+  startIndex: number,
+  endIndex: number,
+): any[] {
+  if (mainScript.length === 0) return mainScript;
+
+  const safeStart = Math.max(0, startIndex);
+  const safeEnd = Math.min(mainScript.length - 1, endIndex);
+
+  if (safeStart > safeEnd) {
+    return mainScript;
+  }
+
+  const before = mainScript.slice(0, safeStart);
+  const after = mainScript.slice(safeEnd + 1);
+
+  return [...before, ...after];
+}

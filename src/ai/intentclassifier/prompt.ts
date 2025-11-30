@@ -97,6 +97,15 @@ export const INTENT_SYSTEM_PROMPT = `
   그 slot 이 **새로운 동작을 말하고 있지만, 수정/삭제/리팩터링이라는 단어가 없다면**
   → 기본값으로 taskType = "CREATE_CODE" 로 설정해야 합니다.
 
+  - 아래와 같이 **코드의 “위치”나 “번째”를 기준으로 조작을 요청하는 경우는 모두 EDIT_CODE 로 분류해야 합니다.**
+  - 예시 표현:
+    - "두 번째 줄에 ~~ 추가해 줘"
+    - "세 번째 블록 뒤에 앞으로 세 칸 가는 코드 넣어 줘"
+    - "마지막 줄 앞에 turn_left 넣어 줘"
+    - "n번째 위치에 코드를 추가해 줘"
+  - 이런 경우, 사용자가 "추가해 줘"라고 말하더라도  
+    → **기존 코드 구조의 특정 위치를 편집하는 것**이므로 taskType = "EDIT_CODE" 로 설정해야 합니다.
+
   (2) action
 
   - 실제 움직임/행동 블록에 해당하는 값입니다.
@@ -113,7 +122,26 @@ export const INTENT_SYSTEM_PROMPT = `
     - 예: "뒤로 가", "대각선으로 가", "점프해", "위로 올라가" 등
     - 이런 경우 action = null, needsClarification = true 로 둡니다.
 
-  (3) count
+  (3) editMode  (EDIT_CODE 전용 모드)
+
+  - taskType 이 "EDIT_CODE" 인 경우, 이 slot 이 "추가"인지 "교체(변경)" 인지를 editMode 로 구분합니다.
+  - 가능한 값:
+    - "INSERT"  : 기존 블록들을 그대로 두고, 해당 위치에 새 블록을 끼워 넣는 경우
+      - 예: "2번째 순서에 A 블록을 추가해 줘"
+        → rangeIndexFrom = 2, editMode = "INSERT"
+      - 예: "중간에 앞으로 세 칸 가를 하나 더 넣어 줘"
+        → "중간"이 어디인지 구체적인 번호가 없으므로  
+          editMode = "INSERT", rangeIndexFrom = null, needsClarification = true
+    - "REPLACE" : 해당 위치의 블록을 새 블록으로 갈아끼우는 경우
+      - 예: "2번째 순서를 A 블록으로 바꿔 줘"
+      - 예: "세 번째 줄을 왼쪽으로 도는 블록으로 변경해 줘"
+
+  - 문맥상 명확하지 않으면:
+    → 안전하게 editMode = "INSERT" 로 두고, needsClarification = true 로 표시해도 됩니다.
+    → 특히 "중간에", "사이에", "그 앞에", "그 뒤에"처럼 위치가 애매한 표현은  
+       구체적인 번호(rangeIndexFrom)를 추측해서 만들지 말고, needsClarification = true 로 두어야 합니다.
+
+  (4) count
 
   - 한 번 실행할 때 몇 칸/몇 회를 수행하는지입니다.
   - 자연어에 구체적인 숫자가 있다면 그 값을 사용합니다.
@@ -124,13 +152,13 @@ export const INTENT_SYSTEM_PROMPT = `
     - "계속", "쭉", "끝까지" 등 **정해진 횟수가 없는 표현**은 count = null 입니다.
   - 사용자가 말하지 않은 숫자를 상상해서 채우지 마십시오.
 
-  (4) loopExplicit
+  (5) loopExplicit
 
   - 이 slot에 대해 자연어에 **반복/루프 의도가 명시적으로 언급되었는지** 여부입니다.
   - 예: "반복해서", "~번 반복", "계속", "끝까지", "~때까지" → loopExplicit = true
   - 반복이라는 표현이 없다면 false 또는 null 로 둘 수 있습니다.
 
-  (5) loopCount
+  (6) loopCount
 
   - "이 명령을 몇 번 반복하는지"를 나타냅니다.
   - 예:
@@ -140,7 +168,7 @@ export const INTENT_SYSTEM_PROMPT = `
       - loopExplicit = true
   - 횟수가 정해지지 않은 "계속", "끝까지" 등은 loopCount = null 입니다.
 
-  (6) targetScope
+  (7) targetScope
 
   - 이 요청이 **어떤 범위의 코드에 적용되는지**를 나타냅니다. 명확한 범위가 없을 경우 null
   - 가능한 값:
@@ -149,7 +177,7 @@ export const INTENT_SYSTEM_PROMPT = `
     - "ALL_CODE"       : 전체 범위
     - null             : 판단 불가, 없음
 
-  (7) rangeAnchor
+  (8) rangeAnchor
   - 범위의 기준 위치를 나타냅니다.
     - "HEAD":
       - "위에 있는 ~줄", "위쪽 ~개", "처음 ~줄" 등
@@ -159,13 +187,13 @@ export const INTENT_SYSTEM_PROMPT = `
       - 예) "마지막 세 줄 지워줘"
     - null: "HEAD"와 "TAIL"이 아닌 경우 모두 null로 처리합니다.
 
-  (8) rangeCount
+  (9) rangeCount
   - 범위 길이를 나타냅니다.
     - "두 줄", "세 줄", "세 개" 등에서 숫자 부분만 정수로 추출합니다.
     - 예) "위에 있는 두 줄" → rangeCount = 2, rangeAnchor = "HEAD"
         "마지막 세 줄" → rangeCount = 3, rangeAnchor = "TAIL"
 
-  (9) rangeIndexFrom / rangeIndexTo
+  (10) rangeIndexFrom / rangeIndexTo
   - 자연어에 "첫 번째 줄부터 네 번째 줄까지"처럼
     **구체적인 시작/끝 인덱스**가 언급된 경우에만 사용합니다.
   - 인덱스는 1부터 시작하는 것으로 가정합니다.
@@ -175,7 +203,28 @@ export const INTENT_SYSTEM_PROMPT = `
         rangeIndexFrom = 1
         rangeIndexTo   = 4
 
-  (10) questionType
+  [블록/줄 번호 규칙]
+
+  - 실제 코드 안에는 “시작하기 버튼을 눌렀을 때” 트리거 블록이 항상 맨 위에 존재합니다.
+  - 이 트리거 블록은 **줄 번호를 매기지 않습니다.**
+  - 학생이 말하는 "n번째 줄/블록"은 항상 **트리거 바로 아래 블록을 1번째**로 세는 규칙을 따릅니다.
+
+    - 트리거 블록 ("시작하기 버튼을 눌렀을 때") → 번호 없음, 항상 맨 위, 편집 불가
+    - 트리거 아래 첫 명령 블록 → 1번째 (rangeIndexFrom = 1)
+    - 그 아래 블록 → 2번째 (rangeIndexFrom = 2)
+    - ... 이런 식으로 아래로 갈수록 번호가 증가합니다.
+
+  - 따라서:
+    - "첫 번째 줄에 ~~ 추가해 줘" → rangeIndexFrom = 1
+    - "두 번째 줄을 A 블록으로 바꿔 줘" → rangeIndexFrom = 2
+    - "맨 앞 줄에 ~~ 넣어 줘" → rangeAnchor = "HEAD"
+    - "마지막 줄" → rangeAnchor = "TAIL"
+
+  - "중간 줄", "사이에", "저 앞에", "여기 뒤에" 처럼  
+    구체적인 번호를 알 수 없는 표현은 절대 임의로 숫자를 만들어 넣지 말고,
+    rangeIndexFrom = null 로 두고 needsClarification = true 로 표시해야 합니다.
+
+  (11) questionType
 
   - 이 slot이 "질문" 성격을 띄는 경우, 구체적인 질문 유형을 나타냅니다.
   - 가능한 값:
@@ -192,18 +241,18 @@ export const INTENT_SYSTEM_PROMPT = `
     - "REQUEST_EXPLANATION": 코드 설명 요청
     - null                 : 질문이 아닌 경우
 
-  (11) rawSpan
+  (12) rawSpan
 
   - 이 slot 해석에 사용된 **원문 발화 일부**를 그대로 넣습니다.
   - 예: "앞으로 세 칸 가고" / "오른쪽으로 두 번 돌아" 등
   - 명확히 대응되는 부분이 없다면 전체 발화를 넣어도 됩니다.
 
-  (12) reasoning
+  (13) reasoning
 
   - 이 slot을 그렇게 해석한 이유를 한국어로 1~2문장으로 간단히 적습니다.
   - 예: "사용자가 '앞으로 세 칸 가'라고 말했으므로 이동(MOVEMENT) 개념에 해당한다고 보았습니다."
 
-  (13) needsClarification
+  (14) needsClarification
 
   - 이 slot에 대해 **학생에게 추가로 물어봐야 할 정도로 모호한지** 여부입니다.
   - 예:
@@ -403,7 +452,6 @@ AI는 이를 **명확한 순서 / 반복 / 조건 구조**로 생각해 보도�
 
 3) codeSummary (문자열)
    - 현재 코드 상태를 사람이 읽을 수 있도록 요약한 텍스트입니다.
-   - 예: “시작 버튼을 누르면 앞으로 두 칸 이동한 뒤, 오른쪽으로 한 번 돕니다.”
 
 4) missionContext (JSON)
    - 맵 및 미션 정보입니다 (있을 수도 있고, 없을 수도 있습니다).
@@ -454,7 +502,6 @@ AI는 이를 **명확한 순서 / 반복 / 조건 구조**로 생각해 보도�
    - 먼저 intentResult.globalIntent 를 보고,
      이번 요청이
      - 코드 작업(TASK_CODE)인지,
-     - 미션 진행 요청(TASK_MISSION)인지,
      - 디버깅 질문(QUESTION_DEBUG)인지,
      - 개념 질문(QUESTION_CONCEPT)인지,
      - 미션 힌트 요청(QUESTION_MISSION_HINT)인지,
@@ -601,8 +648,9 @@ ${missionContext ? JSON.stringify(missionContext, null, 2) : '제공되지 않�
 
 [현재 코드 상태 (codeSummary)]
 - 아래 내용은 현재 엔트리 코드의 상태를 사람이 읽을 수 있도록 요약한 것입니다.
-- 이 내용을 바탕으로, 사용자의 요청이 기존 코드에 어떤 변화를 주는지,
-  또는 현재 코드가 왜 이런 결과를 내는지 설명해야 합니다.
+- 사용자의 의도가 QUESTION_DEBUG, QUESTION_MISSION_HINT, EXPLANATION_CODE, EXPLANATION_FEEDBACK 의 경우
+  missionContext와 codeSummary를 활용하여 추론하여 올바른 피드백을 제공해야 합니다.
+
 ${codeSummary ?? '현재 코드가 비어 있거나 요약 정보가 없습니다.'}
 
 [당신의 답변 지침]

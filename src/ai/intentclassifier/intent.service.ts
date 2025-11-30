@@ -9,6 +9,9 @@ import {
 import {
   normalizeScripts,
   applyScripts,
+  insertBlocksAt,
+  replaceBlocksAt,
+  deleteBlocksRange,
 } from '../../utils/entry/scriptBuilder';
 import { buildCodeSummaryFromScripts } from 'src/utils/entry/codeSummary';
 import {
@@ -237,11 +240,105 @@ export class IntentService {
   }
 
   private async handleEditCodeFromSlot(projectData?: any, slot?: any) {
-    console.log('handle Edit Code');
+    //console.log('handleEditCodeFromSlot', { slot });
+    if (slot.editMode === null) return;
+
+    // 1) script 파싱 (objects[0].script 기준)
+    const { scripts, sourceType } = normalizeScripts(projectData);
+
+    // EIDT_CODE 인데 편집할 코드가 없는 경우
+    if (!scripts || scripts.length === 0) return;
+
+    // 2) slots → 엔트리 블록 생성
+    const newBlocks = buildBlocksFromSlot(slot);
+
+    const mainScript = scripts[0] ?? [];
+    const currentLength = scripts[0].length;
+
+    // 3) slot 정보를 바탕으로 삽입 인덱스를 계산
+    let insertIndex = this.resolveInsertIndexFromSlot(slot, currentLength);
+
+    // 삽입 인덱스 계산 불가
+    if (insertIndex === null) return;
+
+    // 범위 검사
+    if (insertIndex < 1 || insertIndex >= currentLength) return;
+
+    let newScript: any[];
+    switch (slot.editMode) {
+      case 'INSERT': {
+        newScript = insertBlocksAt(mainScript, insertIndex, newBlocks);
+        const newScripts = [...scripts];
+        newScripts[0] = newScript;
+
+        const updatedProjectData = applyScripts(
+          projectData,
+          newScripts,
+          sourceType,
+        );
+
+        return updatedProjectData;
+      }
+      case 'REPLACE': {
+        newScript = replaceBlocksAt(mainScript, insertIndex, newBlocks, 1);
+        const newScripts = [...scripts];
+        newScripts[0] = newScript;
+
+        const updatedProjectData = applyScripts(
+          projectData,
+          newScripts,
+          sourceType,
+        );
+
+        return updatedProjectData;
+      }
+      default: {
+      }
+    }
   }
 
   private async handleDeleteCodeFromSlot(projectData?: any, slot?: any) {
-    console.log('handle Delete Code');
+    //console.log('handleDeleteCodeFromSlot', { slot });
+    const FIRST_EDITABLE_INDEX = 1;
+
+    // 1) script 파싱 (objects[0].script 기준)
+    const { scripts, sourceType } = normalizeScripts(projectData);
+
+    // DELETE_CODE 인데 삭제할 코드가 없는 경우
+    if (!scripts || scripts.length === 0) return;
+
+    const mainScript = scripts[0] ?? [];
+    const currentLength = scripts[0].length;
+
+    const { startIndex, endIndex } = this.resolveDeleteRangeFromSlot(
+      slot,
+      currentLength,
+    );
+
+    // 삭제 범위 해석 불가
+    if (startIndex == null || endIndex == null) return;
+
+    // 유효하지 않은 범위
+    if (
+      startIndex < FIRST_EDITABLE_INDEX ||
+      endIndex < FIRST_EDITABLE_INDEX ||
+      startIndex > endIndex ||
+      endIndex >= currentLength
+    )
+      return;
+
+    const newScript = deleteBlocksRange(mainScript, startIndex, endIndex);
+
+    const newScripts = [...scripts];
+    newScripts[0] = newScript;
+
+    const updatedProjectData = applyScripts(
+      projectData,
+      newScripts,
+      sourceType,
+    );
+
+    return updatedProjectData;
   }
 
   private async handleRefactorCodeFromSlot(projectData?: any, slot?: any) {
@@ -262,5 +359,88 @@ export class IntentService {
 
   private async handleUnknown() {
     console.log('handle Unknown');
+  }
+
+  private resolveInsertIndexFromSlot(
+    slot: any,
+    currentLength: number,
+  ): number | null {
+    const FIRST_EDITABLE_INDEX = 1;
+    const { rangeIndexFrom, rangeAnchor } = slot;
+
+    // n번째 줄 (트리거 블록 제외한 n번째)
+    if (typeof rangeIndexFrom === 'number') {
+      return rangeIndexFrom;
+    }
+
+    // 맨 앞
+    if (rangeAnchor === 'HEAD') return FIRST_EDITABLE_INDEX;
+
+    if (rangeAnchor === 'TAIL') return currentLength;
+
+    return null;
+  }
+
+  private resolveDeleteRangeFromSlot(
+    slot: any,
+    length: number,
+  ): { startIndex: number | null; endIndex: number | null } {
+    const {
+      rangeIndexFrom,
+      rangeIndexTo,
+      rangeAnchor,
+      rangeCount,
+      targetScope,
+    } = slot ?? {};
+
+    // 처음 / 마지막 줄 번호
+    const FIRST_EDITABLE_INDEX = 1;
+    const LAST_EDITABLE_INDEX = length - 1;
+
+    // 명시적인 인덱스 범위: "n번째 줄", "n번째~m번째 줄"
+    if (typeof rangeIndexFrom === 'number') {
+      const from = rangeIndexFrom;
+      const to =
+        typeof rangeIndexTo === 'number' ? rangeIndexTo : rangeIndexFrom; // 한 줄만 지우는 경우
+
+      return {
+        startIndex: from,
+        endIndex: to,
+      };
+    }
+
+    // HEAD + rangeCount: "위에 있는 두 줄 지워줘"
+    if (rangeAnchor === 'HEAD' && typeof rangeCount === 'number') {
+      const startIndex = FIRST_EDITABLE_INDEX;
+      const endIndex = FIRST_EDITABLE_INDEX + rangeCount - 1;
+      return { startIndex, endIndex };
+    }
+
+    // TAIL + rangeCount: "마지막 세 줄 지워줘"
+    if (rangeAnchor === 'TAIL' && typeof rangeCount === 'number') {
+      const endIndex = LAST_EDITABLE_INDEX;
+      const startIndex = LAST_EDITABLE_INDEX - rangeCount + 1;
+      return { startIndex, endIndex };
+    }
+
+    // ALL_CODE: 트리거 제외 전체 삭제
+    if (targetScope === 'ALL_CODE') {
+      if (LAST_EDITABLE_INDEX < FIRST_EDITABLE_INDEX) {
+        return {
+          startIndex: null,
+          endIndex: null,
+        };
+      }
+      return {
+        startIndex: FIRST_EDITABLE_INDEX,
+        endIndex: LAST_EDITABLE_INDEX,
+      };
+    }
+
+    // 그외 해석 불가
+    return {
+      startIndex: null,
+      endIndex: null,
+    };
   }
 }

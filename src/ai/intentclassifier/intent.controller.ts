@@ -16,9 +16,4 @@ export class IntentController {
   conversationTest() {
     return;
   }
-
-  @Get()
-  processTest(@Body('content') utterance: string) {
-    return;
-  }
 }
