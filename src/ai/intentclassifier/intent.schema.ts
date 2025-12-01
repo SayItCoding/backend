@@ -13,6 +13,7 @@ export const Slot = z.object({
   // 실제 행동 블록
   action: z.enum(['move_forward', 'turn_left', 'turn_right']).nullable(),
 
+  // EDIR_CODE 하위 분류
   editMode: z.enum(['INSERT', 'REPLACE']).nullable(),
 
   // 한 번 실행 시 몇 칸/몇 회
@@ -53,6 +54,20 @@ export const Slot = z.object({
 
   // 학생에게 추가로 물어봐야 할 정도로 모호한지
   needsClarification: z.boolean().nullable(),
+
+  // 모호성 유형
+  ambiguityType: z
+    .enum([
+      'REPEAT_COUNT_MISSION', // 반복 횟수 없음
+      'RANGE_SCOPE_VAGUE', // 어느 줄을 말하는지 불명확
+      'UNSUPPORTED_ACTION', // 지원하지 않는 행동
+      'DIRECTION_VAGUE', // 방향 모호
+      'COUNT_OR_LOOP_AMBIGUOUS', //
+      'LOOP_SCOPE_VAGUE', // 전체 or 일부 반복
+      'OTHER',
+    ])
+    .nullable(),
+  ambiguityMessage: z.string().nullable(),
 });
 
 /**

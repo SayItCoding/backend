@@ -99,3 +99,32 @@ export function deleteBlocksRange(
 
   return [...before, ...after];
 }
+
+export function wrapBlocksRange(
+  mainScript: any[],
+  startIndex: number,
+  endIndex: number,
+  wrapper: (bodyBlocks: any[]) => any[],
+): any[] {
+  if (mainScript.length === 0) return mainScript;
+
+  const safeStart = Math.max(0, startIndex);
+  const safeEnd = Math.min(mainScript.length - 1, endIndex);
+
+  if (safeStart > safeEnd) {
+    return mainScript;
+  }
+
+  const before = mainScript.slice(0, safeStart);
+  const body = mainScript.slice(safeStart, safeEnd + 1);
+  const after = mainScript.slice(safeEnd + 1);
+
+  const wrapped = wrapper(body);
+
+  // wrapper가 이상한 걸 반환한 경우 방어
+  if (!Array.isArray(wrapped)) {
+    return mainScript;
+  }
+
+  return [...before, ...wrapped, ...after];
+}

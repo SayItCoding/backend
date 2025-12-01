@@ -36,6 +36,10 @@ function repeatBlock(n: number, inner: EntryBlock[]): EntryBlock {
   });
 }
 
+export function createRepeatBlock(n: number, inner: EntryBlock[]): EntryBlock {
+  return repeatBlock(n, inner);
+}
+
 /** 기본 트리거 블록 생성 */
 export function createTriggerBlock() {
   return {

@@ -5,13 +5,16 @@ import { INTENT_JSON_SCHEMA, IntentItem, IntentItemT } from './intent.schema';
 import {
   createTriggerBlock,
   buildBlocksFromSlot,
+  createRepeatBlock,
 } from 'src/utils/entry/blockBuilder';
+import { EntryBlock } from 'src/utils/entry/blockTypes';
 import {
   normalizeScripts,
   applyScripts,
   insertBlocksAt,
   replaceBlocksAt,
   deleteBlocksRange,
+  wrapBlocksRange,
 } from '../../utils/entry/scriptBuilder';
 import { buildCodeSummaryFromScripts } from 'src/utils/entry/codeSummary';
 import {
@@ -215,58 +218,54 @@ export class IntentService {
   }
 
   private async handleCreateCodeFromSlot(projectData?: any, slot?: any) {
-    //console.log('handleMakeCodeFromSlot', { slot });
+    console.log('handleMakeCodeFromSlot', { slot });
 
-    // 1) script 파싱 (objects[0].script 기준)
+    // script 파싱 (objects[0].script 기준)
     const { scripts, sourceType } = normalizeScripts(projectData);
-
-    // 2) slots → 엔트리 블록 생성
     const newBlocks = buildBlocksFromSlot(slot);
 
-    //console.log(newBlocks);
-
-    // 3) scripts[0] 없으면 트리거 블록 생성
+    // scripts[0] 없으면 트리거 블록 생성
     if (!scripts[0]) {
       scripts[0] = [createTriggerBlock()];
     }
 
-    // 4) 맨 뒤에 붙이기
+    // 맨 뒤에 붙이기
     scripts[0].push(...newBlocks);
 
-    // 5) script를 다시 objects[0].script에 적용
+    // script를 다시 objects[0].script에 적용
     const updatedProjectData = applyScripts(projectData, scripts, sourceType);
 
     return updatedProjectData;
   }
 
   private async handleEditCodeFromSlot(projectData?: any, slot?: any) {
-    //console.log('handleEditCodeFromSlot', { slot });
+    const FIRST_EDITABLE_INDEX = 1;
+    console.log('handleEditCodeFromSlot', { slot });
     if (slot.editMode === null) return;
 
-    // 1) script 파싱 (objects[0].script 기준)
+    // script 파싱 (objects[0].script 기준)
     const { scripts, sourceType } = normalizeScripts(projectData);
 
     // EIDT_CODE 인데 편집할 코드가 없는 경우
     if (!scripts || scripts.length === 0) return;
 
-    // 2) slots → 엔트리 블록 생성
     const newBlocks = buildBlocksFromSlot(slot);
 
     const mainScript = scripts[0] ?? [];
     const currentLength = scripts[0].length;
 
-    // 3) slot 정보를 바탕으로 삽입 인덱스를 계산
-    let insertIndex = this.resolveInsertIndexFromSlot(slot, currentLength);
-
-    // 삽입 인덱스 계산 불가
-    if (insertIndex === null) return;
-
-    // 범위 검사
-    if (insertIndex < 1 || insertIndex >= currentLength) return;
-
     let newScript: any[];
     switch (slot.editMode) {
       case 'INSERT': {
+        const insertIndex = this.resolveInsertIndexFromSlot(
+          slot,
+          currentLength,
+        );
+        // 삽입 인덱스 계산 불가
+        if (insertIndex === null) return;
+        // 범위 검사
+        if (insertIndex < 1 || insertIndex >= currentLength) return;
+
         newScript = insertBlocksAt(mainScript, insertIndex, newBlocks);
         const newScripts = [...scripts];
         newScripts[0] = newScript;
@@ -280,7 +279,29 @@ export class IntentService {
         return updatedProjectData;
       }
       case 'REPLACE': {
-        newScript = replaceBlocksAt(mainScript, insertIndex, newBlocks, 1);
+        // 삭제/리팩
+        const { startIndex, endIndex } = this.resolveRangeFromSlot(
+          slot,
+          currentLength,
+        );
+
+        if (startIndex == null || endIndex == null) return;
+
+        // 유효하지 않은 범위
+        if (
+          startIndex < FIRST_EDITABLE_INDEX ||
+          endIndex < FIRST_EDITABLE_INDEX ||
+          startIndex > endIndex ||
+          endIndex >= currentLength
+        )
+          return;
+
+        newScript = replaceBlocksAt(
+          mainScript,
+          startIndex,
+          newBlocks,
+          endIndex - startIndex + 1,
+        );
         const newScripts = [...scripts];
         newScripts[0] = newScript;
 
@@ -298,10 +319,10 @@ export class IntentService {
   }
 
   private async handleDeleteCodeFromSlot(projectData?: any, slot?: any) {
-    //console.log('handleDeleteCodeFromSlot', { slot });
+    console.log('handleDeleteCodeFromSlot', { slot });
     const FIRST_EDITABLE_INDEX = 1;
 
-    // 1) script 파싱 (objects[0].script 기준)
+    // script 파싱 (objects[0].script 기준)
     const { scripts, sourceType } = normalizeScripts(projectData);
 
     // DELETE_CODE 인데 삭제할 코드가 없는 경우
@@ -310,7 +331,7 @@ export class IntentService {
     const mainScript = scripts[0] ?? [];
     const currentLength = scripts[0].length;
 
-    const { startIndex, endIndex } = this.resolveDeleteRangeFromSlot(
+    const { startIndex, endIndex } = this.resolveRangeFromSlot(
       slot,
       currentLength,
     );
@@ -342,23 +363,60 @@ export class IntentService {
   }
 
   private async handleRefactorCodeFromSlot(projectData?: any, slot?: any) {
-    console.log('handle Refactor Code');
-  }
+    const FIRST_EDITABLE_INDEX = 1;
+    console.log('handleRefactorCodeFromSlot', { slot });
 
-  private async handleQuestion() {
-    console.log('handle Question');
-  }
+    // script 파싱 (objects[0].script 기준)
+    const { scripts, sourceType } = normalizeScripts(projectData);
 
-  private async handleExplanation() {
-    console.log('handle Explanation');
-  }
+    // REFACTOR_CODE 인데 삭제할 코드가 없는 경우
+    if (!scripts || scripts.length === 0) return;
 
-  private async handleOther() {
-    console.log('handle Other');
-  }
+    const mainScript = scripts[0] ?? [];
+    const currentLength = mainScript.length;
 
-  private async handleUnknown() {
-    console.log('handle Unknown');
+    const { startIndex, endIndex } = this.resolveRangeFromSlot(
+      slot,
+      currentLength,
+    );
+
+    if (startIndex == null || endIndex == null) return;
+
+    if (
+      startIndex < FIRST_EDITABLE_INDEX ||
+      endIndex < FIRST_EDITABLE_INDEX ||
+      startIndex > endIndex ||
+      endIndex >= currentLength
+    )
+      return;
+
+    const buildRepeatBlockFromBody = (
+      bodyBlocks: EntryBlock[],
+    ): EntryBlock[] => {
+      if (!Array.isArray(bodyBlocks) || bodyBlocks.length === 0) {
+        return bodyBlocks;
+      }
+
+      const rep = createRepeatBlock(slot.loopCount, bodyBlocks);
+      return [rep];
+    };
+
+    const newScript = wrapBlocksRange(
+      mainScript,
+      startIndex,
+      endIndex,
+      (body) => buildRepeatBlockFromBody(body),
+    );
+
+    const newScripts = [...scripts];
+    newScripts[0] = newScript;
+
+    const updatedProjectData = applyScripts(
+      projectData,
+      newScripts,
+      sourceType,
+    );
+    return updatedProjectData;
   }
 
   private resolveInsertIndexFromSlot(
@@ -381,7 +439,7 @@ export class IntentService {
     return null;
   }
 
-  private resolveDeleteRangeFromSlot(
+  private resolveRangeFromSlot(
     slot: any,
     length: number,
   ): { startIndex: number | null; endIndex: number | null } {
