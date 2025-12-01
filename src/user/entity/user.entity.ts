@@ -28,7 +28,13 @@ export class User {
   password: string; // 해시 저장
 
   @Column('simple-array', { nullable: true })
-  roles?: string[]; // ['user','admin'] 등
+  roles?: string[]; // ['user','teacher'] 등
+
+  @Column({ type: 'int', default: 0 })
+  studyStreak: number;
+
+  @Column({ type: 'date', nullable: true })
+  lastStudyDate: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

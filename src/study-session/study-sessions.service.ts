@@ -4,15 +4,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, QueryFailedError } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { UserStudySession } from '../study-session/user-study-session.entity';
 import { StartStudySessionDto } from './dto/start-study-session.dto';
+import { StudyDayDto, UserStudySummaryDto } from './dto/user-study-summary.dto';
+import { User } from 'src/user/entity/user.entity';
+import { formatDateLocal } from '../utils/formatDate';
 
 @Injectable()
 export class StudySessionsService {
   constructor(
     @InjectRepository(UserStudySession)
     private readonly sessionRepo: Repository<UserStudySession>,
+
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
 
   /**
@@ -89,6 +94,118 @@ export class StudySessionsService {
     session.durationSeconds = seconds;
 
     const saved = await this.sessionRepo.save(session);
+
+    // streak 갱신
+    await this.updateUserStreak(userId, endedAt);
+
     return saved;
+  }
+
+  async getUserStudySummary(
+    userId: number,
+    weekOffset = 0,
+  ): Promise<UserStudySummaryDto> {
+    // 1) 총 학습 시간(초) - 전체 누적
+    const totalRow = await this.sessionRepo
+      .createQueryBuilder('s')
+      .select('COALESCE(SUM(s.durationSeconds), 0)', 'total')
+      .where('s.userId = :userId', { userId })
+      .getRawOne<{ total: string }>();
+
+    const totalStudySeconds = Number(totalRow?.total ?? 0);
+
+    // 2) "이번 주 월요일" 기준 주(start/end) 계산 (로컬 기준)
+    const today = new Date();
+    const todayDateOnly = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    const todayDow = todayDateOnly.getDay(); // 0:일 ~ 6:토
+
+    // 월요일 기준: 월(1)→0일 전, 화(2)→1일 전, ..., 일(0)→6일 전
+    const diffFromMonday = (todayDow + 6) % 7;
+
+    const currentWeekStart = new Date(todayDateOnly);
+    currentWeekStart.setDate(currentWeekStart.getDate() - diffFromMonday);
+    currentWeekStart.setHours(0, 0, 0, 0);
+
+    const currentWeekEnd = new Date(currentWeekStart);
+    currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+    currentWeekEnd.setHours(23, 59, 59, 999);
+
+    // weekOffset 적용 (0: 이번 주, -1: 지난 주, -2: 지지난 주, ...)
+    const start = new Date(currentWeekStart);
+    start.setDate(start.getDate() + weekOffset * 7);
+
+    const end = new Date(currentWeekEnd);
+    end.setDate(end.getDate() + weekOffset * 7);
+
+    // 3) 해당 주간(start~end) 동안의 세션 조회
+    const sessions = await this.sessionRepo.find({
+      where: {
+        userId,
+        startedAt: Between(start, end),
+      },
+    });
+
+    // 날짜별 durationSeconds 합산 (로컬 기준 YYYY-MM-DD)
+    const dayMap = new Map<string, number>();
+    for (const s of sessions) {
+      const d = s.startedAt;
+      const key = formatDateLocal(d); // ★ 여기
+      const prev = dayMap.get(key) ?? 0;
+      dayMap.set(key, prev + (s.durationSeconds ?? 0));
+    }
+
+    const days: StudyDayDto[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+
+      const key = formatDateLocal(d); // 로컬 기준
+      const studySeconds = dayMap.get(key) ?? 0;
+
+      days.push({
+        date: key,
+        label: ['월', '화', '수', '목', '금', '토', '일'][i], // 월~일 고정
+        studySeconds,
+      });
+    }
+
+    return {
+      totalStudySeconds,
+      weekly: {
+        startDate: formatDateLocal(start),
+        endDate: formatDateLocal(end),
+        days,
+      },
+    };
+  }
+
+  private async updateUserStreak(userId: number, endedAt: Date) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    const today = endedAt.toISOString().slice(0, 10);
+    const yesterday = new Date(endedAt);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    if (user.lastStudyDate === today) {
+      // 오늘 이미 계산됨 변화 없음
+      return;
+    }
+
+    if (user.lastStudyDate === yesterdayStr) {
+      // 연속 학습 streak 증가
+      user.studyStreak += 1;
+    } else {
+      // 연속성 끊김 다시 1
+      user.studyStreak = 1;
+    }
+
+    user.lastStudyDate = today;
+    await this.userRepo.save(user);
   }
 }

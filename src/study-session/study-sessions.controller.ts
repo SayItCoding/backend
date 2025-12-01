@@ -7,6 +7,9 @@ import {
   Post,
   UseGuards,
   Req,
+  Get,
+  Query,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { StudySessionsService } from './study-sessions.service';
 import { StartStudySessionDto } from './dto/start-study-session.dto';
@@ -57,5 +60,15 @@ export class StudySessionsController {
       startedAt: session.startedAt,
       endedAt: session.endedAt,
     };
+  }
+
+  @Get('summary')
+  async getMyStudySummary(
+    @Req() req: any,
+    @Query('weekOffset', new DefaultValuePipe(0), ParseIntPipe)
+    weekOffset: number,
+  ) {
+    const userId = req.user.userId ?? req.user.id;
+    return this.studySessionsService.getUserStudySummary(userId, weekOffset);
   }
 }
