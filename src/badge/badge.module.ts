@@ -6,7 +6,7 @@ import { BadgeService } from './badge.service';
 import { BadgeController } from './badge.controller';
 import { UserMission } from 'src/mission/entity/user-mission.entity';
 import { UserDailyStatus } from 'src/user/entity/user-daily-status.entity';
-import { UserLearningSession } from 'src/user/entity/user-learning-session.entity';
+import { UserStudySession } from 'src/study-session/user-study-session.entity';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { UserLearningSession } from 'src/user/entity/user-learning-session.entit
       UserBadge,
       UserMission,
       UserDailyStatus,
-      UserLearningSession,
+      UserStudySession,
     ]),
   ],
   providers: [BadgeService],

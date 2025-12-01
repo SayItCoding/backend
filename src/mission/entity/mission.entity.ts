@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { UserMission } from './user-mission.entity';
+import { UserStudySession } from '../../study-session/user-study-session.entity';
 
 @Entity('missions')
 export class Mission {
@@ -56,4 +57,8 @@ export class Mission {
 
   @OneToMany(() => UserMission, (userMission) => userMission.mission)
   userMissions: UserMission[];
+
+  // 이 미션에서 발생한 모든 학습 세션들
+  @OneToMany(() => UserStudySession, (session) => session.mission)
+  studySessions: UserStudySession[];
 }

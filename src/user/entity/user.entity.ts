@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { UserMission } from '../../mission/entity/user-mission.entity';
+import { UserStudySession } from '../../study-session/user-study-session.entity';
 
 @Entity('users')
 @Unique(['email'])
@@ -37,6 +38,10 @@ export class User {
 
   @OneToMany(() => UserMission, (userMission) => userMission.user)
   userMissions: UserMission[];
+
+  // 유저가 가진 학습 세션들
+  @OneToMany(() => UserStudySession, (session) => session.user)
+  userStudySessions: UserStudySession[];
 
   @BeforeInsert()
   async hashPassword() {

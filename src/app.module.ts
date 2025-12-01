@@ -9,6 +9,7 @@ import { MissionModule } from './mission/mission.module';
 import { AppController } from './app.controller';
 import { IntentModule } from './ai/intentclassifier/intent.module';
 import { UserModule } from './user/user.moduls';
+import { StudySessionsModule } from './study-session/study-sessions.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { UserModule } from './user/user.moduls';
     AuthModule,
     UserModule,
     IntentModule,
+    StudySessionsModule,
     ConfigModule.forRoot({
       isGlobal: true, // 모든 모듈에서 process.env 사용 가능
       envFilePath: [`.env.${process.env.NODE_ENV}`, '.env'],

@@ -6,7 +6,7 @@ import { UserBadge } from './user-badge.entity';
 import { BadgeConditionType } from './badge-condition-type.enum';
 import { UserMission } from '../mission/entity/user-mission.entity';
 import { UserDailyStatus } from 'src/user/entity/user-daily-status.entity';
-import { UserLearningSession } from 'src/user/entity/user-learning-session.entity';
+import { UserStudySession } from 'src/study-session/user-study-session.entity';
 
 @Injectable()
 export class BadgeService {
@@ -17,8 +17,8 @@ export class BadgeService {
     private readonly userBadgeRepo: Repository<UserBadge>,
     @InjectRepository(UserMission)
     private readonly userMissionRepo: Repository<UserMission>,
-    @InjectRepository(UserLearningSession)
-    private readonly learningSessionRepo: Repository<UserLearningSession>,
+    @InjectRepository(UserStudySession)
+    private readonly learningSessionRepo: Repository<UserStudySession>,
     @InjectRepository(UserDailyStatus)
     private readonly dailyStatusRepo: Repository<UserDailyStatus>,
   ) {}
