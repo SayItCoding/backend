@@ -5,8 +5,10 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToOne,
 } from 'typeorm';
 import { UserMission } from './user-mission.entity';
+import { MissionChatAnalysis } from './mission-chat-analysis.entity';
 
 @Entity('mission_chats')
 export class MissionChat {
@@ -30,4 +32,7 @@ export class MissionChat {
   })
   @JoinColumn({ name: 'userMissionId' })
   userMission: UserMission;
+
+  @OneToOne(() => MissionChatAnalysis, (analysis) => analysis.chat)
+  analysis?: MissionChatAnalysis;
 }

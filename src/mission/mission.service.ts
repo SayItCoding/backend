@@ -9,8 +9,10 @@ import {
 import { Mission } from './entity/mission.entity';
 import { UserMission } from './entity/user-mission.entity';
 import { MissionChat } from './entity/mission-chat.entity';
+import { MissionChatAnalysis } from './entity/mission-chat-analysis.entity';
 import { MissionCode } from './entity/mission-code.entity';
 import { IntentService } from 'src/ai/intentclassifier/intent.service';
+import { IntentItemT } from 'src/ai/intentclassifier/intent.schema';
 import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
@@ -22,6 +24,8 @@ export class MissionService {
     private readonly userMissionRepo: Repository<UserMission>,
     @InjectRepository(MissionChat)
     private readonly missionChatRepo: Repository<MissionChat>,
+    @InjectRepository(MissionChatAnalysis)
+    private readonly missionChatAnalysisRepo: Repository<MissionChatAnalysis>,
     @InjectRepository(MissionCode)
     private readonly missionCodeRepo: Repository<MissionCode>,
     private readonly intentService: IntentService,
@@ -331,5 +335,88 @@ export class MissionService {
     });
 
     return mission?.context ?? null;
+  }
+
+  // IntentItem → MissionChatAnalysis 엔티티로 변환 + 저장하는 헬퍼
+  private async saveMissionChatAnalysis(
+    chat: MissionChat,
+    intent: IntentItemT,
+  ) {
+    const slots = intent.slots ?? [];
+
+    const taskTypeSet = new Set<
+      'CREATE_CODE' | 'EDIT_CODE' | 'DELETE_CODE' | 'REFACTOR_CODE'
+    >();
+    const questionTypeSet = new Set<
+      | 'WHY_WRONG'
+      | 'HOW_TO_FIX'
+      | 'WHAT_IS_CONCEPT'
+      | 'DIFFERENCE_CONCEPT'
+      | 'REQUEST_HINT'
+      | 'REQUEST_EXPLANATION'
+    >();
+    const ambiguityTypeSet = new Set<
+      | 'REPEAT_COUNT_MISSION'
+      | 'RANGE_SCOPE_VAGUE'
+      | 'UNSUPPORTED_ACTION'
+      | 'DIRECTION_VAGUE'
+      | 'COUNT_OR_LOOP_AMBIGUOUS'
+      | 'LOOP_SCOPE_VAGUE'
+      | 'OTHER'
+    >();
+
+    let hasLoopIntent = false;
+    const loopCounts: number[] = [];
+    let hasAmbiguity = false;
+
+    for (const s of slots) {
+      if (s.taskType) taskTypeSet.add(s.taskType);
+      if (s.questionType) questionTypeSet.add(s.questionType);
+
+      if (s.loopExplicit || s.loopCount != null) {
+        hasLoopIntent = true;
+      }
+      if (typeof s.loopCount === 'number') {
+        loopCounts.push(s.loopCount);
+      }
+
+      if (s.needsClarification) {
+        hasAmbiguity = true;
+      }
+      if (s.ambiguityType) {
+        ambiguityTypeSet.add(s.ambiguityType);
+      }
+    }
+
+    let avgLoopCount: number | null = null;
+    let maxLoopCount: number | null = null;
+    if (loopCounts.length > 0) {
+      const sum = loopCounts.reduce((a, b) => a + b, 0);
+      avgLoopCount = Math.round(sum / loopCounts.length);
+      maxLoopCount = Math.max(...loopCounts);
+    }
+
+    const analysis = this.missionChatAnalysisRepo.create({
+      chat,
+      chatId: chat.id,
+      globalIntent: intent.globalIntent,
+      confidence: intent.confidence ?? 0.8,
+      slots,
+      slotCount: slots.length,
+      hasTaskCode: taskTypeSet.size > 0,
+      hasQuestion: questionTypeSet.size > 0,
+      taskTypes: taskTypeSet.size ? Array.from(taskTypeSet) : null,
+      questionTypes: questionTypeSet.size ? Array.from(questionTypeSet) : null,
+      hasLoopIntent,
+      avgLoopCount,
+      maxLoopCount,
+      hasAmbiguity,
+      ambiguityTypes: ambiguityTypeSet.size
+        ? Array.from(ambiguityTypeSet)
+        : null,
+      rawIntent: intent,
+    });
+
+    await this.missionChatAnalysisRepo.save(analysis);
   }
 }
