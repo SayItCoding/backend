@@ -237,6 +237,7 @@ export class MissionService {
     const assistantMessage = AIResult.message;
     const updatedProjectData = AIResult.projectData; // 변경된 코드 | null
     const didChangeCode = AIResult.didChangeCode ?? false;
+    const intentItem = AIResult.intent;
 
     if (didChangeCode) {
       const newMissionCode = this.missionCodeRepo.create({
@@ -258,6 +259,14 @@ export class MissionService {
       role: 'user',
     });
     await this.missionChatRepo.save(userChat);
+
+    // Intent 분석 결과 저장 (Study Insight용)
+    try {
+      await this.saveMissionChatAnalysis(userChat, intentItem);
+    } catch (e) {
+      console.error('❌ MissionChatAnalysis 저장 실패:', e);
+      // 인사이트는 부가 기능이므로 여기서 실패해도 흐름은 계속 진행
+    }
 
     // assistant 메시지 저장
     const assistantChat = this.missionChatRepo.create({

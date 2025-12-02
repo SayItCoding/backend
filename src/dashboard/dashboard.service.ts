@@ -1,16 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
+import {
+  paginate,
+  Pagination,
+  IPaginationOptions,
+} from 'nestjs-typeorm-paginate';
 import { MissionChat } from '../mission/entity/mission-chat.entity';
+import { UserMission } from 'src/mission/entity/user-mission.entity';
 import { MissionChatAnalysis } from '../mission/entity/mission-chat-analysis.entity';
 import {
   StudyInsightSummaryDto,
   IntentCount,
 } from './dto/study-insight-summary.dto';
+import { RecentMissionItemDto } from './dto/recent-mission.dto';
 
 @Injectable()
 export class DashboardService {
   constructor(
+    @InjectRepository(UserMission)
+    private readonly userMissionRepo: Repository<UserMission>,
     @InjectRepository(MissionChat)
     private readonly missionChatRepo: Repository<MissionChat>,
     @InjectRepository(MissionChatAnalysis)
@@ -215,7 +224,7 @@ export class DashboardService {
     return summary;
   }
 
-  // ▽ 주간 모드
+  // 주간 모드
   async getStudyInsightsByWeek(params: {
     userId: number;
     weekOffset: number;
@@ -244,7 +253,7 @@ export class DashboardService {
     });
   }
 
-  // ▽ 전체 기간 모드
+  // 전체 기간 모드
   async getStudyInsightsOverall(
     userId: number,
   ): Promise<StudyInsightSummaryDto> {
@@ -253,5 +262,41 @@ export class DashboardService {
       from: null,
       to: null,
     });
+  }
+
+  // 최근 학습 미션
+  async paginateRecentMissions(
+    userId: number,
+    options: IPaginationOptions,
+  ): Promise<Pagination<RecentMissionItemDto>> {
+    const qb = this.userMissionRepo
+      .createQueryBuilder('um')
+      .innerJoinAndSelect('um.mission', 'm')
+      .where('um.userId = :userId', { userId })
+      .orderBy('um.updatedAt', 'DESC')
+      .addOrderBy('um.id', 'DESC');
+
+    // UserMission 기준으로 페이지네이션
+    const paged = await paginate<UserMission>(qb, options);
+
+    // items만 DTO로 매핑하고, meta / links는 그대로 유지
+    const items: RecentMissionItemDto[] = paged.items.map((um) => {
+      const m = um.mission;
+
+      const status = um.isCompleted ? '성공' : '재도전'; // 실제 필드명에 맞게 수정
+
+      return {
+        missionId: m.id,
+        title: m.title,
+        date: (um.updatedAt ?? new Date()).toISOString(),
+        status,
+        category: m.category ?? '미션', // Mission 필드에 맞게 수정
+      };
+    });
+
+    return {
+      ...paged,
+      items,
+    };
   }
 }

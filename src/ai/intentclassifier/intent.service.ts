@@ -27,8 +27,6 @@ import { MissionService } from 'src/mission/mission.service';
 import { MissionCode } from 'src/mission/entity/mission-code.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MissionChat } from '../../mission/entity/mission-chat.entity';
-import { MissionChatAnalysis } from '../../mission/entity/mission-chat-analysis.entity';
 
 type MissionContext = {
   map?: string[][];
@@ -43,10 +41,6 @@ export class IntentService {
   constructor(
     @InjectRepository(MissionCode)
     private missionCodeRepo: Repository<MissionCode>,
-    @InjectRepository(MissionChat)
-    private missionChatRepo: Repository<MissionChat>,
-    @InjectRepository(MissionChatAnalysis)
-    private missionChatAnalysisRepo: Repository<MissionChatAnalysis>,
 
     private readonly openai: OpenAIClient,
 

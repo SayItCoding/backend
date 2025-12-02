@@ -2,19 +2,20 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entity/user.entity';
+import { UserProfileDto } from './dto/user-profile.dto';
 
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User) private readonly repo: Repository<User>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
 
   findById(id: number) {
-    return this.repo.findOne({ where: { id } });
+    return this.userRepo.findOne({ where: { id } });
   }
 
   findByEmail(email: string) {
-    return this.repo.findOne({ where: { email } });
+    return this.userRepo.findOne({ where: { email } });
   }
 
   async create(data: {
@@ -23,15 +24,29 @@ export class UserService {
     password: string;
     roles?: string[];
   }) {
-    const user = this.repo.create(data);
-    return this.repo.save(user);
+    const user = this.userRepo.create(data);
+    return this.userRepo.save(user);
   }
 
-  async getProfileOrThrow(id: number) {
-    const user = await this.findById(id);
-    if (!user) throw new NotFoundException('User not found');
-    // 비밀번호 제거
-    const { password, ...safe } = user as any;
-    return safe;
+  async getMe(userId: number): Promise<UserProfileDto> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const dto: UserProfileDto = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles ?? null,
+      studyStreak: user.studyStreak,
+      lastStudyDate: user.lastStudyDate,
+      createdAt: user.createdAt,
+    };
+
+    return dto;
   }
 }
