@@ -13,30 +13,29 @@ import { StudyInsightSummaryDto } from './dto/study-insight-summary.dto';
 import { Pagination } from 'nestjs-typeorm-paginate';
 import { RecentMissionItemDto } from './dto/recent-mission.dto';
 
-@UseGuards(JwtAuthGuard)
 @Controller('api/v1/dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get('study-insights')
   async getStudyInsights(
     @Req() req,
     @Query('mode') mode = 'overall',
     @Query('weekOffset') weekOffset = '0',
   ): Promise<StudyInsightSummaryDto> {
-    const userId = req.user.id;
-
     if (mode === 'week') {
       return this.dashboardService.getStudyInsightsByWeek({
-        userId,
+        userId: req.user.userId,
         weekOffset: Number(weekOffset),
       });
     }
 
     // 기본은 전체 기간 모드
-    return this.dashboardService.getStudyInsightsOverall(userId);
+    return this.dashboardService.getStudyInsightsOverall(req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('recent-missions')
   async getRecentMissions(
     @Req() req: any,
