@@ -875,8 +875,8 @@ export class IntentService {
     else if (taskType === 'EDIT_CODE') {
       donePart =
         count <= 1
-          ? `"${actionLabel}" 행동이 한 번만 실행되도록 바꿨어요.`
-          : `"${actionLabel}" 행동이 ${count}번 실행되도록 코드가 수정했어요.`;
+          ? `해당 절차에 "${actionLabel}" 행동이 한 번만 실행되도록 바꿨어요.`
+          : `해당 절차에 "${actionLabel}" 행동이 ${count}번 실행되도록 코드가 수정했어요.`;
     }
 
     // DELETE
