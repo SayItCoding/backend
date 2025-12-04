@@ -12,7 +12,12 @@ import { MissionChat } from './entity/mission-chat.entity';
 import { MissionChatAnalysis } from './entity/mission-chat-analysis.entity';
 import { MissionCode } from './entity/mission-code.entity';
 import { IntentService } from 'src/ai/intentclassifier/intent.service';
-import { IntentItemT } from 'src/ai/intentclassifier/intent.schema';
+import {
+  IntentItemT,
+  TaskType,
+  QuestionType,
+  AmbiguityType,
+} from 'src/ai/intentclassifier/intent.schema';
 import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
@@ -340,10 +345,15 @@ export class MissionService {
   async getMissionContext(missionId: number): Promise<any | null> {
     const mission = await this.missionRepo.findOne({
       where: { id: missionId },
-      select: ['id', 'context'],
+      select: ['id', 'category', 'context'],
     });
 
-    return mission?.context ?? null;
+    if (!mission) return null;
+
+    return {
+      category: mission.category,
+      context: mission.context,
+    };
   }
 
   // IntentItem → MissionChatAnalysis 엔티티로 변환 + 저장하는 헬퍼
@@ -353,26 +363,9 @@ export class MissionService {
   ) {
     const slots = intent.slots ?? [];
 
-    const taskTypeSet = new Set<
-      'CREATE_CODE' | 'EDIT_CODE' | 'DELETE_CODE' | 'REFACTOR_CODE'
-    >();
-    const questionTypeSet = new Set<
-      | 'WHY_WRONG'
-      | 'HOW_TO_FIX'
-      | 'WHAT_IS_CONCEPT'
-      | 'DIFFERENCE_CONCEPT'
-      | 'REQUEST_HINT'
-      | 'REQUEST_EXPLANATION'
-    >();
-    const ambiguityTypeSet = new Set<
-      | 'REPEAT_COUNT_MISSION'
-      | 'RANGE_SCOPE_VAGUE'
-      | 'UNSUPPORTED_ACTION'
-      | 'DIRECTION_VAGUE'
-      | 'COUNT_OR_LOOP_AMBIGUOUS'
-      | 'LOOP_SCOPE_VAGUE'
-      | 'OTHER'
-    >();
+    const taskTypeSet = new Set<TaskType>();
+    const questionTypeSet = new Set<QuestionType>();
+    const ambiguityTypeSet = new Set<AmbiguityType>();
 
     let hasLoopIntent = false;
     const loopCounts: number[] = [];

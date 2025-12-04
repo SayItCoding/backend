@@ -1,15 +1,3 @@
-export type Slot = {
-  action: 'move_forward' | 'turn_left' | 'turn_right' | null;
-  count: number | null; // null이면 1
-  loopExplicit: boolean | null;
-  loopCount: number | null;
-  targetScope: string | null;
-  rangeAnchor: string | null;
-  rangeCount: number | null;
-  rangeIndexFrom: number | null;
-  rangeIndexTo: number | null;
-};
-
 export type EntryBlock = {
   id: string;
   x: number;

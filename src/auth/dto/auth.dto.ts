@@ -1,4 +1,5 @@
 import { IsEmail, IsString, MinLength } from 'class-validator';
+import { UserProfileDto } from 'src/user/dto/user-profile.dto';
 
 export class SignupDto {
   @IsEmail() email: string;
@@ -11,6 +12,12 @@ export class LoginDto {
   @IsString() @MinLength(6) password: string;
 }
 
+export class LoginResponseDto {
+  access_token: string;
+  refresh_token: string;
+  user: UserProfileDto;
+}
+
 export type JwtPayload = {
   sub: number;
   email: string;
@@ -20,4 +27,4 @@ export type JwtPayload = {
   jti?: string;
 };
 
-export type AuthTokens = { access_token: string; refresh_token?: string };
+export type AuthTokens = { access_token: string; refresh_token: string };

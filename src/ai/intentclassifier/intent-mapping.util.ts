@@ -1,25 +1,21 @@
-import { IntentItemT } from './intent.schema';
+import {
+  IntentItemT,
+  TaskType,
+  QuestionType,
+  AmbiguityType,
+} from './intent.schema';
 import { MissionChat } from '../../mission/entity/mission-chat.entity';
 import { MissionChatAnalysis } from '../../mission/entity/mission-chat-analysis.entity';
 import { Repository } from 'typeorm';
 
 function extractTaskTypes(slots: IntentItemT['slots']) {
-  const set = new Set<
-    'CREATE_CODE' | 'EDIT_CODE' | 'DELETE_CODE' | 'REFACTOR_CODE'
-  >();
+  const set = new Set<TaskType>();
   for (const s of slots) if (s.taskType) set.add(s.taskType);
   return set.size ? Array.from(set) : null;
 }
 
 function extractQuestionTypes(slots: IntentItemT['slots']) {
-  const set = new Set<
-    | 'WHY_WRONG'
-    | 'HOW_TO_FIX'
-    | 'WHAT_IS_CONCEPT'
-    | 'DIFFERENCE_CONCEPT'
-    | 'REQUEST_HINT'
-    | 'REQUEST_EXPLANATION'
-  >();
+  const set = new Set<QuestionType>();
   for (const s of slots) if (s.questionType) set.add(s.questionType);
   return set.size ? Array.from(set) : null;
 }
@@ -46,15 +42,7 @@ function extractLoopStats(slots: IntentItemT['slots']) {
 }
 
 function extractAmbiguity(slots: IntentItemT['slots']) {
-  const types = new Set<
-    | 'REPEAT_COUNT_MISSION'
-    | 'RANGE_SCOPE_VAGUE'
-    | 'UNSUPPORTED_ACTION'
-    | 'DIRECTION_VAGUE'
-    | 'COUNT_OR_LOOP_AMBIGUOUS'
-    | 'LOOP_SCOPE_VAGUE'
-    | 'OTHER'
-  >();
+  const types = new Set<AmbiguityType>();
   let hasAmbiguity = false;
 
   for (const s of slots) {

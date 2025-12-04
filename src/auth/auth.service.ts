@@ -6,8 +6,15 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'crypto';
 import { UserService } from '../user/user.service';
-import { LoginDto, SignupDto, AuthTokens } from './dto/auth.dto';
+import {
+  LoginDto,
+  SignupDto,
+  AuthTokens,
+  LoginResponseDto,
+} from './dto/auth.dto';
+import { UserProfileDto } from 'src/user/dto/user-profile.dto';
 import { parseToSeconds } from '../utils/jwt-exp';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class AuthService {
@@ -24,13 +31,27 @@ export class AuthService {
     return this.issueTokens(user.id, user.email, user.roles);
   }
 
-  async login(dto: LoginDto): Promise<AuthTokens> {
+  async login(dto: LoginDto): Promise<LoginResponseDto> {
     const user = await this.userService.findByEmail(dto.email);
     // 유저 열거 방지: 동일 메시지
     if (!user || !(await user.comparePassword(dto.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    return this.issueTokens(user.id, user.email, user.roles);
+
+    // 토큰 발급 (기존 로직 그대로 재사용)
+    const tokens = await this.issueTokens(user.id, user.email, user.roles);
+    // tokens: { access_token, refresh_token }
+
+    // 유저 엔티티 → 응답용 DTO로 변환
+    const userProfile = plainToInstance(UserProfileDto, user, {
+      excludeExtraneousValues: true, // @Expose 된 필드만
+    });
+
+    // 토큰 + 유저정보 합쳐서 반환
+    return {
+      ...tokens,
+      user: userProfile,
+    };
   }
 
   /** 액세스(짧게) + 리프레시(길게) 둘 다 발급 예시 */

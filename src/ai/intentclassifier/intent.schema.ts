@@ -10,13 +10,16 @@ export const Slot = z.object({
     .enum(['CREATE_CODE', 'EDIT_CODE', 'DELETE_CODE', 'REFACTOR_CODE'])
     .nullable(),
 
-  // 실제 행동 블록
+  // 실제 가능한 행동 블록
   action: z.enum(['move_forward', 'turn_left', 'turn_right']).nullable(),
 
   // EDIR_CODE 하위 분류
   editMode: z.enum(['INSERT', 'REPLACE']).nullable(),
 
-  // 한 번 실행 시 몇 칸/몇 회
+  // REFACTOR_CODE 하위 분류
+  refactMode: z.enum(['WRAP_IN_LOOP', 'MERGE_SAME_ACTIONS']).nullable(),
+
+  // 반복을 사용하지 않는 행동 횟수
   count: z.number().int().positive().nullable(),
 
   // 반복 의도
@@ -25,7 +28,7 @@ export const Slot = z.object({
   // 몇 번 반복할지
   loopCount: z.number().int().positive().nullable(),
 
-  // 코드 대상 범위
+  // 코드(절차) 대상 범위
   targetScope: z.enum(['SELECTED_BLOCK', 'BLOCK_RANGE', 'ALL_CODE']).nullable(),
 
   // BLOCK_RANGE 상세 정보
@@ -37,12 +40,14 @@ export const Slot = z.object({
   // 질문 유형
   questionType: z
     .enum([
-      'WHY_WRONG',
+      'WHY_WRONG_MISSION',
+      'WHY_WRONG_GENERAL',
       'HOW_TO_FIX',
       'WHAT_IS_CONCEPT',
       'DIFFERENCE_CONCEPT',
       'REQUEST_HINT',
       'REQUEST_EXPLANATION',
+      'REQUEST_FEEDBACK',
     ])
     .nullable(),
 
@@ -58,17 +63,33 @@ export const Slot = z.object({
   // 모호성 유형
   ambiguityType: z
     .enum([
-      'REPEAT_COUNT_MISSION', // 반복 횟수 없음
+      'REPEAT_COUNT_MISSING', // 반복 횟수 없음
       'RANGE_SCOPE_VAGUE', // 어느 줄을 말하는지 불명확
-      'UNSUPPORTED_ACTION', // 지원하지 않는 행동
       'DIRECTION_VAGUE', // 방향 모호
       'COUNT_OR_LOOP_AMBIGUOUS', //
+      'TARGET_BLOCK_VAGUE',
       'LOOP_SCOPE_VAGUE', // 전체 or 일부 반복
       'OTHER',
     ])
     .nullable(),
   ambiguityMessage: z.string().nullable(),
+
+  limitationType: z
+    .enum([
+      'UNSUPPORTED_ACTION', // 지원하지 않는 행동
+      'UNSUPPORTED_COMBINATION',
+      'OTHER',
+    ])
+    .nullable(),
+  limitationMessage: z.string().nullable(),
 });
+
+export type TaskType = NonNullable<z.infer<typeof Slot>['taskType']>;
+export type QuestionType = NonNullable<z.infer<typeof Slot>['questionType']>;
+export type AmbiguityType = NonNullable<z.infer<typeof Slot>['ambiguityType']>;
+export type LimitationType = NonNullable<
+  z.infer<typeof Slot>['limitationType']
+>;
 
 /**
  * Intent 전체 구조
@@ -76,11 +97,7 @@ export const Slot = z.object({
 export const IntentItem = z.object({
   globalIntent: z.enum([
     'TASK_CODE',
-    'QUESTION_DEBUG',
-    'QUESTION_CONCEPT',
-    'QUESTION_MISSION_HINT',
-    'EXPLANATION_CODE',
-    'EXPLANATION_FEEDBACK',
+    'QUESTION',
     'SMALL_TALK',
     'OTHER',
     'UNKNOWN',
@@ -89,6 +106,7 @@ export const IntentItem = z.object({
   confidence: z.number().min(0).max(1).default(0.8),
 });
 
+export type SlotT = z.infer<typeof Slot>;
 export type IntentItemT = z.infer<typeof IntentItem>;
 
 /**

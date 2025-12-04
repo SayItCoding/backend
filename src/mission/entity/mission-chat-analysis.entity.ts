@@ -6,6 +6,11 @@ import {
   OneToOne,
   JoinColumn,
 } from 'typeorm';
+import {
+  TaskType,
+  QuestionType,
+  AmbiguityType,
+} from '../../ai/intentclassifier/intent.schema';
 import { MissionChat } from './mission-chat.entity';
 
 @Entity('mission_chat_analyses')
@@ -27,16 +32,7 @@ export class MissionChatAnalysis {
     type: 'varchar',
     length: 40,
   })
-  globalIntent:
-    | 'TASK_CODE'
-    | 'QUESTION_DEBUG'
-    | 'QUESTION_CONCEPT'
-    | 'QUESTION_MISSION_HINT'
-    | 'EXPLANATION_CODE'
-    | 'EXPLANATION_FEEDBACK'
-    | 'SMALL_TALK'
-    | 'OTHER'
-    | 'UNKNOWN';
+  globalIntent: 'TASK_CODE' | 'QUESTION' | 'SMALL_TALK' | 'OTHER' | 'UNKNOWN';
 
   // IntentItem.confidence
   @Column({ type: 'float', default: 0.8 })
@@ -58,24 +54,13 @@ export class MissionChatAnalysis {
   @Column({ type: 'boolean', default: false })
   hasQuestion: boolean;
 
-  // 포함된 taskType들 (중복 제거)
-  @Column({ type: 'jsonb', nullable: true })
-  taskTypes:
-    | ('CREATE_CODE' | 'EDIT_CODE' | 'DELETE_CODE' | 'REFACTOR_CODE')[]
-    | null;
+  // 포함된 taskType들
+  @Column('text', { array: true, nullable: true })
+  taskTypes: TaskType[] | null;
 
-  // 포함된 questionType들 (중복 제거)
-  @Column({ type: 'jsonb', nullable: true })
-  questionTypes:
-    | (
-        | 'WHY_WRONG'
-        | 'HOW_TO_FIX'
-        | 'WHAT_IS_CONCEPT'
-        | 'DIFFERENCE_CONCEPT'
-        | 'REQUEST_HINT'
-        | 'REQUEST_EXPLANATION'
-      )[]
-    | null;
+  // 포함된 questionType들
+  @Column('text', { array: true, nullable: true })
+  questionTypes: QuestionType[] | null;
 
   // 반복(루프) 관련 의도 존재 여부
   @Column({ type: 'boolean', default: false })
@@ -92,19 +77,9 @@ export class MissionChatAnalysis {
   @Column({ type: 'boolean', default: false })
   hasAmbiguity: boolean;
 
-  // 포함된 ambiguityType들 (중복 제거)
-  @Column({ type: 'jsonb', nullable: true })
-  ambiguityTypes:
-    | (
-        | 'REPEAT_COUNT_MISSION'
-        | 'RANGE_SCOPE_VAGUE'
-        | 'UNSUPPORTED_ACTION'
-        | 'DIRECTION_VAGUE'
-        | 'COUNT_OR_LOOP_AMBIGUOUS'
-        | 'LOOP_SCOPE_VAGUE'
-        | 'OTHER'
-      )[]
-    | null;
+  // 포함된 ambiguityType들
+  @Column('text', { array: true, nullable: true })
+  ambiguityTypes: AmbiguityType[] | null;
 
   // IntentItem 전체(raw) 보관
   @Column({ type: 'jsonb' })

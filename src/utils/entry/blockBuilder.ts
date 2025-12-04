@@ -1,4 +1,5 @@
-import { EntryBlock, Slot, genId, withDefaults } from './blockTypes';
+import { SlotT } from 'src/ai/intentclassifier/intent.schema';
+import { EntryBlock, genId, withDefaults } from './blockTypes';
 
 function numberBlock(value?: number): EntryBlock {
   return withDefaults({ id: genId('num'), type: 'number', params: [value] });
@@ -60,18 +61,19 @@ export function createTriggerBlock() {
 }
 
 /** 슬롯을 기반으로 “추가할 블록들”을 만든다. (트리거 제외) */
-export function buildBlocksFromSlot(slot: Slot): EntryBlock[] {
+export function buildBlocksFromSlot(slot: SlotT): EntryBlock[] {
   if (!slot.action) return [];
 
   const action = slot.action;
   const count = Math.max(1, slot.count ?? 1);
   const loop = slot.loopExplicit;
+  const loopCount = Math.max(1, slot.loopCount ?? 1);
 
   switch (action) {
     case 'move_forward': {
       if (loop) {
         const inner = [moveBlock('move_forward')];
-        return [repeatBlock(count, inner)];
+        return [repeatBlock(loopCount, inner)];
       }
       const blocks: EntryBlock[] = [];
       for (let i = 0; i < count; i++) {
@@ -82,7 +84,7 @@ export function buildBlocksFromSlot(slot: Slot): EntryBlock[] {
     case 'turn_left': {
       if (loop) {
         const inner = [turnBlock('turn_left')];
-        return [repeatBlock(count, inner)];
+        return [repeatBlock(loopCount, inner)];
       }
       const blocks: EntryBlock[] = [];
       for (let i = 0; i < count; i++) {
@@ -93,7 +95,7 @@ export function buildBlocksFromSlot(slot: Slot): EntryBlock[] {
     case 'turn_right': {
       if (loop) {
         const inner = [turnBlock('turn_right')];
-        return [repeatBlock(count, inner)];
+        return [repeatBlock(loopCount, inner)];
       }
       const blocks: EntryBlock[] = [];
       for (let i = 0; i < count; i++) {
