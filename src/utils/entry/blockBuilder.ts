@@ -67,7 +67,13 @@ export function buildBlocksFromSlot(slot: SlotT): EntryBlock[] {
   const action = slot.action;
   const count = Math.max(1, slot.count ?? 1);
   const loop = slot.loopExplicit;
-  const loopCount = Math.max(1, slot.loopCount ?? 1);
+
+  let loopCount;
+  if (loop && slot.loopCount === null && slot.count !== null) {
+    loopCount = count;
+  } else {
+    loopCount = 1;
+  }
 
   switch (action) {
     case 'move_forward': {
