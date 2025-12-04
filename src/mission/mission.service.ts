@@ -19,6 +19,16 @@ import {
   AmbiguityType,
 } from 'src/ai/intentclassifier/intent.schema';
 import { NotFoundException } from '@nestjs/common';
+import {
+  judgeMissionFromEntryScript,
+  MissionDefinition,
+  MissionJudgeResult,
+  extractActionsFromEntryScript,
+  CellType,
+} from '../utils/entry/mission-judge';
+import { EntryBlock } from '../utils/entry/blockTypes';
+import { Direction } from '../utils/entry/mission-judge';
+import { normalizeScripts } from '../utils/entry/scriptBuilder';
 
 @Injectable()
 export class MissionService {
@@ -420,5 +430,283 @@ export class MissionService {
     });
 
     await this.missionChatAnalysisRepo.save(analysis);
+  }
+
+  /**
+   * 같은 동작 블록이 연속해서 2개 이상 등장하는지 검사하는 헬퍼
+   * - 검사 대상: move_forward, rotate_direction_left, rotate_direction_right
+   * - repeat_basic 안/밖 모두 재귀적으로 훑음
+   */
+  private hasConsecutiveSameActionBlocks(script: EntryBlock[]): boolean {
+    const SIMPLE_TYPES = new Set([
+      'move_forward',
+      'rotate_direction_left',
+      'rotate_direction_right',
+    ]);
+
+    const dfs = (blocks: EntryBlock[]): boolean => {
+      let lastType: string | null = null;
+      let runLength = 0;
+
+      for (const b of blocks) {
+        const isSimple = SIMPLE_TYPES.has(b.type);
+        const currentType = isSimple ? b.type : null;
+
+        if (currentType) {
+          if (currentType === lastType) {
+            runLength += 1;
+            // runLength: 1 → 첫 블록, 2 이상 → 연속
+            if (runLength >= 2) {
+              return true; // 같은 동작이 연달아 나옴
+            }
+          } else {
+            lastType = currentType;
+            runLength = 1;
+          }
+        } else {
+          // 단순 동작이 아니면 연속 카운트 리셋
+          lastType = null;
+          runLength = 0;
+        }
+
+        // 자식 statements 도 재귀적으로 검사
+        if (Array.isArray(b.statements)) {
+          for (const slot of b.statements) {
+            if (Array.isArray(slot) && slot.length > 0) {
+              if (dfs(slot)) return true;
+            }
+          }
+        }
+      }
+      return false;
+    };
+
+    return dfs(script);
+  }
+
+  private toMissionDefinitionOrNull(
+    mission: Mission,
+  ): MissionDefinition | null {
+    const ctx: any = mission.context;
+    if (!ctx) {
+      console.error(`Mission ${mission.id} has no context`);
+      return null;
+    }
+
+    const mapArr = ctx.map;
+    const start = ctx.START;
+    const end = ctx.END;
+    const initialDir = ctx.initialDirection; // key 이름: initialDirection
+
+    // 기본 구조 검증
+    if (!Array.isArray(mapArr)) {
+      console.error(`Mission ${mission.id} has invalid context.map`, mapArr);
+      return null;
+    }
+
+    if (!start || typeof start.x !== 'number' || typeof start.y !== 'number') {
+      console.error(`Mission ${mission.id} has invalid START`, start);
+      return null;
+    }
+
+    if (!end || typeof end.x !== 'number' || typeof end.y !== 'number') {
+      console.error(`Mission ${mission.id} has invalid END`, end);
+      return null;
+    }
+
+    // 1) 맵 변환: string[][] → CellType[][]
+    const grid: CellType[][] = mapArr.map((row: string[]) =>
+      row.map((cell) => {
+        switch (cell) {
+          case 'VOID':
+            // 이동 불가능
+            return 'WALL';
+          case 'END':
+            // 도착 지점
+            return 'GOAL';
+          case 'START':
+          case 'EMPTY':
+            // START도 실제로는 지나갈 수 있는 칸이라 EMPTY 취급
+            return 'EMPTY';
+          default:
+            return 'EMPTY';
+        }
+      }),
+    );
+
+    if (!grid.length || !grid[0]?.length) {
+      console.error(`Mission ${mission.id} has empty grid`, grid);
+      return null;
+    }
+
+    // 2) 방향 변환
+    const directionMap: Record<string, Direction> = {
+      '+x': 'SOUTH',
+      '-x': 'NORTH',
+      '+y': 'EAST',
+      '-y': 'WEST',
+    };
+
+    const startDir: Direction = directionMap[initialDir] ?? 'EAST';
+
+    // 좌표계 주의:
+    // x = row index, y = col index (map[x][y])
+    return {
+      id: mission.id,
+      map: {
+        width: grid[0].length,
+        height: grid.length,
+        grid,
+      },
+      start: {
+        row: start.x,
+        col: start.y,
+        dir: startDir,
+      },
+      end: {
+        row: end.x,
+        col: end.y,
+      },
+      maxSteps: undefined,
+    };
+  }
+
+  async checkMissionSuccess(params: {
+    userId: number;
+    missionId: number;
+    missionCodeId?: number;
+  }) {
+    const { userId, missionId, missionCodeId } = params;
+
+    // 1) 미션 조회
+    const mission = await this.missionRepo.findOne({
+      where: { id: missionId },
+    });
+    if (!mission) {
+      throw new NotFoundException('Mission not found');
+    }
+
+    // 2) userMission 확인
+    const membership = await this.userMissionRepo.findOne({
+      where: { userId, missionId },
+    });
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this mission');
+    }
+
+    // 3) 검사할 MissionCode 결정
+    let codeToCheck: MissionCode | null = null;
+
+    // missionCodeId 있을 때: 0도 허용해야 하므로 != null 로 체크
+    if (missionCodeId != null) {
+      codeToCheck = await this.missionCodeRepo.findOne({
+        where: {
+          id: missionCodeId,
+          userMission: { id: membership.id },
+        },
+      });
+      if (!codeToCheck) {
+        throw new NotFoundException(`MissionCode ${missionCodeId} not found`);
+      }
+    } else if (membership.latestMissionCodeId) {
+      codeToCheck = await this.missionCodeRepo.findOne({
+        where: {
+          id: membership.latestMissionCodeId,
+          userMission: { id: membership.id },
+        },
+      });
+    }
+
+    // 코드 스냅샷이 없으면 "판정 불가 → 실패" 로 돌려주자 (500 내지 말고)
+    if (!codeToCheck?.projectData) {
+      return {
+        missionId,
+        missionCodeId: null,
+        isSuccess: false,
+        failReason: 'NOT_AT_GOAL' as const,
+        finalState: null,
+      };
+    }
+
+    // 4) 나머지는 시뮬레이션 에러가 나도 절대 throw하지 않도록 try/catch
+    try {
+      // projectData → EntryBlock[]
+      let projectData = codeToCheck.projectData as any;
+      if (typeof projectData === 'string') {
+        projectData = JSON.parse(projectData);
+      }
+
+      const { scripts } = normalizeScripts(projectData);
+      const mainScript: EntryBlock[] = scripts[0] ?? [];
+
+      // 5) MissionDefinition 변환
+      const missionDef = this.toMissionDefinitionOrNull(mission);
+      if (!missionDef) {
+        // context가 잘못된 미션이면 역시 "실패"로 응답만 한다
+        return {
+          missionId,
+          missionCodeId: codeToCheck.id,
+          isSuccess: false,
+          failReason: 'NOT_AT_GOAL' as const,
+          finalState: null,
+        };
+      }
+
+      // 6) 시뮬레이션
+      const judge = judgeMissionFromEntryScript(missionDef, mainScript);
+
+      // 7) 스타일(반복문 사용) 진단
+      const hasConsecutive = this.hasConsecutiveSameActionBlocks(mainScript);
+      const isStyleValid = !hasConsecutive;
+
+      // 최종 성공 기준: 오직 도달 여부만
+      const isSuccess = judge.isSuccess;
+
+      // 8) 미션 성공 시 user_missions 업데이트
+      if (isSuccess) {
+        try {
+          // 이미 완료한 미션이면 completedAt은 유지
+          if (!membership.isCompleted) {
+            membership.isCompleted = true;
+            membership.completedAt = new Date();
+
+            // 옵션: 성공 시점의 코드 스냅샷을 latest로 고정하고 싶으면 유지
+            membership.latestMissionCodeId = codeToCheck.id;
+
+            await this.userMissionRepo.save(membership);
+          }
+        } catch (e) {
+          // 여기서 에러가 나더라도 판정 결과는 그대로 반환 (UX 우선)
+          console.error(
+            'checkMissionSuccess: user_missions 업데이트 중 오류:',
+            e,
+          );
+        }
+      }
+
+      return {
+        missionId,
+        missionCodeId: codeToCheck.id,
+        isSuccess,
+        failReason: judge.isSuccess ? undefined : judge.failReason,
+        finalState: judge.finalState,
+
+        style: {
+          hasConsecutiveSameActions: hasConsecutive, // true면 “반복문 추천”
+          isStyleValid, // false면 스타일 코칭 대상
+        },
+      };
+    } catch (e) {
+      console.error('checkMissionSuccess judge error:', e);
+
+      // 어떤 에러든 500 대신 "실패" 응답
+      return {
+        missionId,
+        missionCodeId: codeToCheck.id,
+        isSuccess: false,
+        failReason: 'NOT_AT_GOAL' as const,
+        finalState: null,
+      };
+    }
   }
 }

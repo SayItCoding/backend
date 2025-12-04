@@ -113,7 +113,7 @@ export class DashboardService {
 
     if (total === 0) {
       summary.strengths.push('분석할 대화가 아직 없습니다.');
-      summary.suggestions.push('미션을 수행하면 학습 인사이트가 표시됩니다.');
+      summary.suggestions.push('미션을 수행하면 학습 분석이 표시됩니다.');
       return summary;
     }
 
@@ -297,6 +297,43 @@ export class DashboardService {
     return {
       ...paged,
       items,
+    };
+  }
+
+  /**
+   * 대시보드용 미션 요약
+   * - attemptedMissions: 이 유저가 시도한 user_missions 개수
+   * - solvedMissions: isCompleted = true 인 user_missions 개수
+   * - totalMissions: 프론트에서 "진행도"로 쓰기 위해 attempted와 동일하게 둠
+   * - accuracy: solved / attempted * 100 (정수 반올림)
+   * - aiFixRate: 추후 구현 전까지 0으로 고정
+   */
+  async getMissionSummary(userId: number) {
+    // 시도한 미션 수 (user_missions row 수)
+    const attemptedMissions = await this.userMissionRepo.count({
+      where: { userId },
+    });
+
+    // 성공한 미션 수 (isCompleted = true)
+    const solvedMissions = await this.userMissionRepo.count({
+      where: { userId, isCompleted: true },
+    });
+
+    const totalMissions = attemptedMissions; // 현재는 "시도한 미션 수"를 전체로 보고 진행도 계산
+    const accuracy =
+      attemptedMissions > 0
+        ? Math.round((solvedMissions / attemptedMissions) * 100)
+        : 0;
+
+    // 아직 별도 로직 없으니 0으로 두고, 나중에 MissionChatAnalysis 기반으로 계산 가능
+    const aiFixRate = 0;
+
+    return {
+      totalMissions,
+      attemptedMissions,
+      solvedMissions,
+      accuracy,
+      aiFixRate,
     };
   }
 }

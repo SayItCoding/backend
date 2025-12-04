@@ -18,6 +18,13 @@ import { RecentMissionItemDto } from './dto/recent-mission.dto';
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
+  // 미션 요약 API
+  @Get('mission-summary')
+  async getMissionSummary(@Req() req: any) {
+    const userId = req.user?.userId ?? req.user?.id;
+    return this.dashboardService.getMissionSummary(userId);
+  }
+
   @Get('study-insights')
   async getStudyInsights(
     @Req() req,

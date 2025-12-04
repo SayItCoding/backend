@@ -97,4 +97,21 @@ export class MissionController {
       missionCodeId,
     });
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':missionId/check-success')
+  @HttpCode(200)
+  async checkMissionSuccess(
+    @Param('missionId', ParseIntPipe) missionId: number,
+    @Body('missionCodeId') missionCodeId: number | undefined,
+    @Req() req: any,
+  ) {
+    const userId = req.user.userId ?? req.user.id;
+
+    return this.missionService.checkMissionSuccess({
+      userId,
+      missionId,
+      missionCodeId,
+    });
+  }
 }
