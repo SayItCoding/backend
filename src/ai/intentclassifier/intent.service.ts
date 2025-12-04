@@ -103,7 +103,7 @@ export class IntentService {
       userPrompt = buildConversationUserPrompt(utterance, intentItem);
     }
 
-    console.log(userPrompt);
+    //console.log(userPrompt);
 
     const response = await client.responses.create({
       model: 'gpt-4o-mini',
@@ -233,7 +233,7 @@ export class IntentService {
   }
 
   private async handleCreateCodeFromSlot(projectData?: any, slot?: any) {
-    console.log('handleCreateCodeFromSlot', { slot });
+    //console.log('handleCreateCodeFromSlot', { slot });
 
     // script 파싱 (objects[0].script 기준)
     const { scripts, sourceType } = normalizeScripts(projectData);
@@ -709,9 +709,22 @@ export class IntentService {
 
     // 4) 제한/모호 없음 → globalIntent 기준 분기
     switch (normalized.globalIntent) {
-      case 'TASK_CODE':
+      case 'TASK_CODE': {
+        const slots = normalized.slots ?? [];
+        const taskSlots = slots.filter((s) => s.taskType != null);
+
+        // 모든 task slot이 CREATE_CODE이고, 2개 이상인 경우 → 모두에 대해 멘트 생성
+        const allCreateOnly =
+          taskSlots.length > 1 &&
+          taskSlots.every((s) => s.taskType === 'CREATE_CODE');
+
+        if (allCreateOnly) {
+          return this.buildMultiCreateCodeMessage(taskSlots);
+        }
+
         // 코드 작업 요청인데, 제한/모호 없음 → 서버 템플릿으로 2문장 생성
         return this.buildTaskCodeDoneMessage(primarySlot);
+      }
 
       case 'QUESTION':
         switch (normalized.slots[0].questionType) {
@@ -848,8 +861,8 @@ export class IntentService {
     }
   }
 
-  // TASK_CODE
-  private buildTaskCodeDoneMessage(slot: any): string {
+  // TASK_CODE 멘트 core (실행 안내 제외)
+  private buildTaskCodeDoneCore(slot: any): string {
     const taskType = slot.taskType;
     const action = slot.action as string | null;
     const count = (slot.count as number | null) ?? 1;
@@ -886,24 +899,76 @@ export class IntentService {
 
     // REFACTOR
     else if (taskType === 'REFACTOR_CODE') {
-      const actionLabel = action ? (actionMap[action] ?? '동작') : '동작';
+      const actionLabel2 = action ? (actionMap[action] ?? '동작') : '동작';
       const loopCount = (slot.loopCount as number | null) ?? null;
 
       if (slot.refactMode === 'MERGE_SAME_ACTIONS') {
         if (loopCount && loopCount > 1) {
-          // 같은 동작이 loopCount번 반복 → 하나의 반복으로 합침
-          donePart = `"${actionLabel}"가 ${loopCount}번 이어지는 부분을 반복 구조로 정리해서 더 간단하게 만들었어요.`;
+          // 같은 동작이 loopCount번 이어지는 부분을 반복 구조로 정리
+          donePart = `"${actionLabel2}"가 ${loopCount}번 이어지는 부분을 반복 구조로 정리해서 더 간단하게 만들었어요.`;
         } else {
-          // loopCount가 없거나 1인 예외 상황 대비용
-          donePart = `"${actionLabel}"가 연달아 이어지는 부분을 반복을 사용해서 더 간단하게 정리했어요.`;
+          // loopCount가 없거나 1인 예외 상황 대비
+          donePart = `"${actionLabel2}"가 연달아 이어지는 부분을 반복을 사용해서 더 간단하게 정리했어요.`;
         }
       } else {
-        // 그 외 REFACTOR 모드 (예: 기본 정리)
-        donePart = `"${actionLabel}" 흐름을 더 깔끔하게 정리해뒀어요.`;
+        // 그 외 refactor 모드
+        donePart = `"${actionLabel2}" 흐름을 더 깔끔하게 정리해뒀어요.`;
       }
     }
 
+    return donePart;
+  }
+
+  // TASK_CODE (단일/대표 slot용) – 실행 안내까지 포함
+  private buildTaskCodeDoneMessage(slot: any): string {
+    const donePart = this.buildTaskCodeDoneCore(slot);
+
     // 실행 안내 멘트
+    const runSentences = [
+      '이제 실행해서 어떻게 되는지 살펴보세요!',
+      '이제 한 번 실행해 보면서 움직임을 확인해보세요!',
+      '이제 코드를 실행해 보며 잘 동작하는지 확인해볼까요?',
+      '이제 실행해서 캐릭터가 어떻게 움직이는지 확인해보면 좋아요!',
+      '그럼 실행해서 바뀐 동작을 직접 확인해보세요!',
+    ];
+    const runPart =
+      runSentences[Math.floor(Math.random() * runSentences.length)];
+
+    return `${donePart} ${runPart}`;
+  }
+
+  // 멀티 CREATE_CODE 슬롯용 멘트 빌더
+  private buildMultiCreateCodeMessage(taskSlots: any[]): string {
+    const actionMap: Record<string, string> = {
+      move_forward: '앞으로 가기',
+      turn_left: '왼쪽으로 돌기',
+      turn_right: '오른쪽으로 돌기',
+    };
+
+    // 모든 slot의 count가 1인 경우에만 예쁜 문장으로 합치기
+    const allCountOne = taskSlots.every((s) => {
+      const c = (s.count as number | null) ?? 1;
+      return c <= 1;
+    });
+
+    let donePart: string;
+
+    if (allCountOne) {
+      // 예: "오른쪽으로 돌기", "앞으로 가기" 절차를 마지막 절차에 순서대로 추가했어요.
+      const labels = taskSlots.map((s) => {
+        const action = s.action as string | null;
+        return action ? (actionMap[action] ?? '동작') : '동작';
+      });
+
+      const quoted = labels.map((l) => `"${l}"`);
+      donePart = `${quoted.join(', ')} 절차를 마지막 절차에 순서대로 추가했어요.`;
+    } else {
+      // count가 섞여 있는 경우는 기존 per-slot 멘트들을 그대로 이어붙이기
+      const parts = taskSlots.map((s) => this.buildTaskCodeDoneCore(s));
+      donePart = parts.join(' ');
+    }
+
+    // 실행 안내 멘트는 공통
     const runSentences = [
       '이제 실행해서 어떻게 되는지 살펴보세요!',
       '이제 한 번 실행해 보면서 움직임을 확인해보세요!',
