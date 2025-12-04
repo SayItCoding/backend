@@ -55,11 +55,11 @@ export class MissionChatAnalysis {
   hasQuestion: boolean;
 
   // 포함된 taskType들
-  @Column('text', { array: true, nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   taskTypes: TaskType[] | null;
 
   // 포함된 questionType들
-  @Column('text', { array: true, nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   questionTypes: QuestionType[] | null;
 
   // 반복(루프) 관련 의도 존재 여부
@@ -78,7 +78,7 @@ export class MissionChatAnalysis {
   hasAmbiguity: boolean;
 
   // 포함된 ambiguityType들
-  @Column('text', { array: true, nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   ambiguityTypes: AmbiguityType[] | null;
 
   // IntentItem 전체(raw) 보관
