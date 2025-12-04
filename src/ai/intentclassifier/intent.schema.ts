@@ -29,7 +29,7 @@ export const Slot = z.object({
   loopCount: z.number().int().positive().nullable(),
 
   // 코드(절차) 대상 범위
-  targetScope: z.enum(['SELECTED_BLOCK', 'BLOCK_RANGE', 'ALL_CODE']).nullable(),
+  targetScope: z.enum(['BLOCK_RANGE', 'ALL_CODE']).nullable(),
 
   // BLOCK_RANGE 상세 정보
   rangeAnchor: z.enum(['HEAD', 'TAIL']).nullable(),
